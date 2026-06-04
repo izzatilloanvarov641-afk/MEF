@@ -7,8 +7,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const low = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
+const { createClient } = require('@supabase/supabase-js');
 const crypto = require('crypto');
 
 const app = express();
@@ -20,9 +19,10 @@ const JWT_SECRET = process.env.JWT_SECRET || 'mef-secret';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 
 // ── DATABASE ─────────────────────────────────────────────────
-const adapter = new FileSync('mef-db.json');
-const db = low(adapter);
-db.defaults({ users: [], matches: [] }).write();
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
 
 // ── MIDDLEWARE ───────────────────────────────────────────────
 app.use(cors({ origin: true, credentials: true }));
@@ -31,12 +31,12 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── AUTH MIDDLEWARE ──────────────────────────────────────────
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const token = req.cookies.mef_token || (req.headers['authorization'] || '').replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Not logged in' });
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = db.get('users').find({ id: payload.userId }).value();
+    const { data: user } = await supabase.from('users').select('*').eq('id', payload.userId).maybeSingle();
     if (!user) return res.status(401).json({ error: 'User not found' });
     req.user = { id: user.id, username: user.username, email: user.email, games_played: user.games_played, games_won: user.games_won };
     next();
@@ -60,11 +60,14 @@ app.post('/api/auth/register', async (req, res) => {
   if (!/^[a-zA-Z0-9_]+$/.test(username)) return res.status(400).json({ error: 'Username: letters, numbers, underscores only' });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email' });
   if (password.length < 6) return res.status(400).json({ error: 'Password min 6 characters' });
-  if (db.get('users').find({ email }).value()) return res.status(409).json({ error: 'Email already registered' });
-  if (db.get('users').find({ username }).value()) return res.status(409).json({ error: 'Username taken' });
+  const { data: existingEmail } = await supabase.from('users').select('id').eq('email', email).maybeSingle();
+  if (existingEmail) return res.status(409).json({ error: 'Email already registered' });
+  const { data: existingUsername } = await supabase.from('users').select('id').eq('username', username).maybeSingle();
+  if (existingUsername) return res.status(409).json({ error: 'Username taken' });
   const hash = await bcrypt.hash(password, 12);
   const id = Date.now().toString();
-  db.get('users').push({ id, username, email, password_hash: hash, games_played: 0, games_won: 0, best_ehs: 0, best_growth: 0, total_trades: 0, match_history: [], created_at: new Date().toISOString() }).write();
+  const { error } = await supabase.from('users').insert({ id, username, email, password_hash: hash, games_played: 0, games_won: 0, best_ehs: 0, best_growth: 0, total_trades: 0, match_history: [], created_at: new Date().toISOString() });
+  if (error) return res.status(500).json({ error: 'Registration failed' });
   const token = jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: '7d' });
   res.cookie('mef_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
   res.json({ success: true, user: { id, username, email, games_played: 0, games_won: 0, isAdmin: username === ADMIN_USERNAME } });
@@ -73,11 +76,11 @@ app.post('/api/auth/register', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-  const user = db.get('users').find({ email }).value();
+  const { data: user } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
   if (!user) return res.status(401).json({ error: 'No account with that email' });
   const valid = await bcrypt.compare(password, user.password_hash);
   if (!valid) return res.status(401).json({ error: 'Incorrect password' });
-  db.get('users').find({ id: user.id }).assign({ last_login: new Date().toISOString() }).write();
+  await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
   res.cookie('mef_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
   res.json({ success: true, user: { id: user.id, username: user.username, email: user.email, games_played: user.games_played, games_won: user.games_won, isAdmin: user.username === ADMIN_USERNAME } });
@@ -88,15 +91,16 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/auth/me', requireAuth, (req, res) => {
-  const u = db.get('users').find({ id: req.user.id }).value();
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  const { data: u } = await supabase.from('users').select('*').eq('id', req.user.id).maybeSingle();
   res.json({ user: { ...req.user, isAdmin: req.user.username === ADMIN_USERNAME, match_history: u.match_history || [], best_ehs: u.best_ehs || 0, best_growth: u.best_growth || 0, total_trades: u.total_trades || 0 } });
 });
 
-app.get('/api/leaderboard', (req, res) => {
-  const users = db.get('users').value().map(u => ({ username: u.username, games_played: u.games_played, games_won: u.games_won, best_ehs: u.best_ehs || 0, best_growth: u.best_growth || 0, win_rate: u.games_played > 0 ? Math.round(u.games_won / u.games_played * 100) : 0 }));
-  users.sort((a, b) => b.games_won - a.games_won || b.best_ehs - a.best_ehs);
-  res.json({ leaderboard: users.slice(0, 50) });
+app.get('/api/leaderboard', async (req, res) => {
+  const { data: users } = await supabase.from('users').select('username, games_played, games_won, best_ehs, best_growth');
+  const leaderboard = (users || []).map(u => ({ username: u.username, games_played: u.games_played, games_won: u.games_won, best_ehs: u.best_ehs || 0, best_growth: u.best_growth || 0, win_rate: u.games_played > 0 ? Math.round(u.games_won / u.games_played * 100) : 0 }));
+  leaderboard.sort((a, b) => b.games_won - a.games_won || b.best_ehs - a.best_ehs);
+  res.json({ leaderboard: leaderboard.slice(0, 50) });
 });
 
 // ── GAME DATA ────────────────────────────────────────────────
@@ -377,12 +381,12 @@ function advanceTurn(room) {
 }
 
 // ── SOCKET.IO ────────────────────────────────────────────────
-function authSocket(socket, cb) {
+async function authSocket(socket, cb) {
   const token = socket.handshake.auth.token || socket.handshake.headers.cookie?.split('mef_token=')[1]?.split(';')[0];
   if (!token) return cb(null);
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    const user = db.get('users').find({ id: payload.userId }).value();
+    const { data: user } = await supabase.from('users').select('*').eq('id', payload.userId).maybeSingle();
     cb(user || null);
   } catch (e) { cb(null); }
 }
@@ -673,7 +677,7 @@ io.on('connection', socket => {
 });
 
 // ── END GAME ─────────────────────────────────────────────────
-function endGame(code) {
+async function endGame(code) {
   const room = rooms[code];
   if (!room) return;
   const sorted = [...room.players].sort((a,b)=>{
@@ -681,20 +685,21 @@ function endGame(code) {
     const bEhs=b.ehs.reduce((s,v)=>s+v,0)/Math.max(b.ehs.length,1);
     return bEhs-aEhs;
   });
-  sorted.forEach((p,i)=>{
-    const u=db.get('users').find({username:p.name}).value();
-    if(!u)return;
-    const c=getC(room,p.countryId);
-    const avgEhs=p.ehs.reduce((s,v)=>s+v,0)/Math.max(p.ehs.length,1);
-    const growth=((c.gdpCap-p.gdpCapStart)/p.gdpCapStart*100).toFixed(1);
-    db.get('users').find({username:p.name}).assign({
-      games_played:(u.games_played||0)+1,
-      games_won:(u.games_won||0)+(i===0?1:0),
-      best_ehs:Math.max(u.best_ehs||0,Math.round(avgEhs)),
-      best_growth:Math.max(u.best_growth||0,parseFloat(growth)),
-      match_history:[...(u.match_history||[]),{date:new Date().toISOString(),country:p.countryId,final_ehs:Math.round(avgEhs),rank:i+1,growth}].slice(-20)
-    }).write();
-  });
+  for (const [i, p] of sorted.entries()) {
+    const { data: u } = await supabase.from('users').select('*').eq('username', p.name).maybeSingle();
+    if (!u) continue;
+    const c = getC(room, p.countryId);
+    const avgEhs = p.ehs.reduce((s,v)=>s+v,0)/Math.max(p.ehs.length,1);
+    const growth = ((c.gdpCap - p.gdpCapStart) / p.gdpCapStart * 100).toFixed(1);
+    const match_history = [...(u.match_history || []), { date: new Date().toISOString(), country: p.countryId, final_ehs: Math.round(avgEhs), rank: i+1, growth }].slice(-20);
+    await supabase.from('users').update({
+      games_played: (u.games_played || 0) + 1,
+      games_won: (u.games_won || 0) + (i === 0 ? 1 : 0),
+      best_ehs: Math.max(u.best_ehs || 0, Math.round(avgEhs)),
+      best_growth: Math.max(u.best_growth || 0, parseFloat(growth)),
+      match_history
+    }).eq('username', p.name);
+  }
 }
 
 // ── SERVE PAGES ──────────────────────────────────────────────
