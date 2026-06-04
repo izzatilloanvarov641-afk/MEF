@@ -715,7 +715,18 @@ function submitTurn(){
   const text=document.getElementById('justText').value.trim();
   const words=text.split(/\s+/).filter(w=>w.length>0).length;
   if(words<50){alert('Please write at least 50 words for your justification.');return;}
-  socket.emit('submitTurn',{policy:myPolicy,justification:text});
+  // Always send a complete policy — default to current country values for any slider not touched
+  const me=myPlayer();const c=getC(me?.countryId);
+  const policy={
+    interest:       myPolicy.interest      !==undefined ? myPolicy.interest      : (c?.interest  ??0),
+    tax:            myPolicy.tax           !==undefined ? myPolicy.tax           : (c?.tax       ??0),
+    govSpend:       myPolicy.govSpend      !==undefined ? myPolicy.govSpend      : (c?.govSpend  ??0),
+    tradeOpenness:  myPolicy.tradeOpenness !==undefined ? myPolicy.tradeOpenness : 0,
+    monetaryPolicy: myPolicy.monetaryPolicy!==undefined ? myPolicy.monetaryPolicy: 0,
+    infraSpend:     myPolicy.infraSpend    !==undefined ? myPolicy.infraSpend    : 0,
+    rdSpend:        myPolicy.rdSpend       !==undefined ? myPolicy.rdSpend       : 0,
+  };
+  socket.emit('submitTurn',{policy,justification:text});
   document.getElementById('readyBadge').style.display='inline';
   document.getElementById('endTurnBtn').disabled=true;
   closeModal('justModal');

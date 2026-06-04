@@ -204,14 +204,14 @@ function simulateCountry(c, policy, room) {
   const sanctionCount = (room.sanctions||[]).filter(s=>s.target===c.id&&s.active).length;
 
   // Apply policy
-  if (policy) {
-    c.interest = policy.interest;
-    c.tax = policy.tax;
-    c.govSpend = policy.govSpend;
-    c.tradeOpenness = policy.tradeOpenness || 0;
-    c.monetaryPolicy = policy.monetaryPolicy || 0;
-    c.infraSpend = policy.infraSpend || 0;
-    c.rdSpend = policy.rdSpend || 0;
+  if (policy && policy.interest !== undefined && policy.tax !== undefined && policy.govSpend !== undefined) {
+    c.interest   = +policy.interest;
+    c.tax        = +policy.tax;
+    c.govSpend   = +policy.govSpend;
+    c.tradeOpenness  = +(policy.tradeOpenness  ?? 0);
+    c.monetaryPolicy = +(policy.monetaryPolicy ?? 0);
+    c.infraSpend     = +(policy.infraSpend     ?? 0);
+    c.rdSpend        = +(policy.rdSpend        ?? 0);
   } else {
     // AI — personality-driven with universal stress overrides
     const personality = c._personality || 'HAWK';
