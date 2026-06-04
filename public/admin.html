@@ -352,16 +352,21 @@ function renderDisasters(state){
   buildCountrySelect('indicatorCountrySelect',countries,id=>{selectedIndicatorCountry=id;renderIndicatorFields(id,state);});
 }
 
-function buildCountrySelect(elId,countries,onSelect){
-  const el=document.getElementById(elId);if(!el)return;
-  el.innerHTML=countries.slice(0,20).map(c=>`<div class="ctile" data-id="${c.id}" onclick="selectCountryTile(this,'${elId}','${c.id}',${JSON.stringify(onSelect.toString())})"><div style="font-size:18px">${c.flag}</div><div style="font-size:9px;color:var(--text2);margin-top:2px">${c.name.split(' ')[0]}</div></div>`).join('');
-}
-
-function selectCountryTile(el,gridId,id,fnStr){
-  document.querySelectorAll(`#${gridId} .ctile`).forEach(t=>t.classList.remove('selected'));
-  el.classList.add('selected');
-  if(gridId==='disasterCountrySelect')selectedDisasterCountry=id;
-  if(gridId==='indicatorCountrySelect'){selectedIndicatorCountry=id;renderIndicatorFields(id,adminState);}
+function buildCountrySelect(elId, countries, onSelect) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const prevId = el.querySelector('.ctile.selected')?.dataset.id;
+  el.innerHTML = countries.slice(0, 20).map(c =>
+    `<div class="ctile" data-id="${c.id}"><div style="font-size:18px">${c.flag}</div><div style="font-size:9px;color:var(--text2);margin-top:2px">${c.name.split(' ')[0]}</div></div>`
+  ).join('');
+  el.querySelectorAll('.ctile').forEach(tile => {
+    if (tile.dataset.id === prevId) tile.classList.add('selected');
+    tile.addEventListener('click', () => {
+      el.querySelectorAll('.ctile').forEach(t => t.classList.remove('selected'));
+      tile.classList.add('selected');
+      onSelect(tile.dataset.id);
+    });
+  });
 }
 
 function selectDisaster(el,type){
