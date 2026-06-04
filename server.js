@@ -508,7 +508,7 @@ io.on('connection', socket => {
   socket.on('submitTurn', ({ policy, justification }) => {
     const code=socket.data.roomCode; const room=rooms[code]; if(!room||room.phase!=='playing')return;
     const p=room.players.find(p=>p.socketId===socket.id); if(!p||p.ready)return;
-    room.pendingActions[socket.id]={policy};
+    room.pendingActions[socket.id]=policy;
     if(justification){ room.justifications.push({ turn:room.turn, playerName:p.name, countryId:p.countryId, text:justification, policy, adminScore:null, adminFeedback:null, socketId:socket.id }); }
     p.ready=true;
     io.to(code).emit('playerReady',{name:p.name});
