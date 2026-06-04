@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Economic Forum</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+:root{--bg:#06080f;--navy:#0a0f1c;--card:#0d1220;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e4e9f5;--text2:#6b7589;--text3:#2e3547;--gold:#c8a84a;--gold2:#e2c46a;--green:#10b981;--red:#ef4444;--amber:#f59e0b;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--display:'Bebas Neue',sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);overflow-x:hidden}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:52px 52px;mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,black 30%,transparent 100%)}
+nav{position:fixed;top:0;left:0;right:0;z-index:200;padding:0 48px;height:60px;display:flex;align-items:center;gap:10px;background:rgba(6,8,15,.85);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+.nav-brand{font-family:var(--display);font-size:20px;letter-spacing:.12em;color:var(--gold);text-decoration:none}
+.nav-gap{flex:1}
+.nav-btn{font-size:13px;font-family:var(--font);font-weight:500;padding:7px 18px;border-radius:7px;cursor:pointer;transition:all .2s;border:none}
+.nav-login{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.nav-login:hover{border-color:rgba(255,255,255,.2);color:var(--text)}
+.nav-signup{background:var(--gold);color:var(--bg)}
+.nav-signup:hover{background:var(--gold2)}
+.nav-user{display:none;align-items:center;gap:10px}
+.nav-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--green));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--bg)}
+.nav-username{font-size:13px;font-weight:500}
+.nav-logout{font-size:12px;color:var(--text2);background:transparent;border:1px solid var(--border);padding:5px 12px;border-radius:6px;cursor:pointer;font-family:var(--font)}
+.nav-logout:hover{color:var(--red);border-color:rgba(239,68,68,.3)}
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:100px 24px 60px;text-align:center;position:relative;z-index:1}
+.hero-eye{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-bottom:22px;opacity:0;animation:up .7s .15s forwards}
+.hero-h1{font-family:var(--display);font-size:clamp(68px,11vw,148px);line-height:.9;letter-spacing:.02em;opacity:0;animation:up .7s .28s forwards}
+.hero-h1 .t1{color:var(--text)}.hero-h1 .t2{color:var(--gold);display:block}.hero-h1 .t3{color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.12);display:block}
+.hero-p{font-size:clamp(14px,1.8vw,17px);color:var(--text2);max-width:520px;line-height:1.75;margin:26px auto 0;font-weight:300;opacity:0;animation:up .7s .42s forwards}
+.hero-actions{display:flex;gap:12px;margin-top:40px;justify-content:center;flex-wrap:wrap;opacity:0;animation:up .7s .55s forwards}
+.btn-gold{background:var(--gold);color:var(--bg);font-family:var(--font);font-size:14px;font-weight:500;padding:13px 32px;border-radius:8px;text-decoration:none;border:none;cursor:pointer;transition:all .2s}
+.btn-gold:hover{background:var(--gold2);transform:translateY(-2px)}
+.btn-outline{background:transparent;color:var(--text);font-family:var(--font);font-size:14px;padding:13px 32px;border-radius:8px;text-decoration:none;border:1px solid var(--border2);cursor:pointer;transition:all .2s}
+.btn-outline:hover{border-color:rgba(255,255,255,.22)}
+.hero-stats{display:flex;justify-content:center;max-width:560px;margin:52px auto 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;opacity:0;animation:fadeIn .8s .7s forwards}
+.hstat{flex:1;padding:18px 20px;text-align:center;border-right:1px solid var(--border)}
+.hstat:last-child{border-right:none}
+.hstat-val{font-family:var(--display);font-size:30px;color:var(--gold);letter-spacing:.05em}
+.hstat-lab{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-top:2px}
+.sec{padding:88px 24px;max-width:1080px;margin:0 auto;position:relative;z-index:1}
+.sec-eye{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--gold);text-transform:uppercase;margin-bottom:14px}
+.sec-h2{font-family:var(--display);font-size:clamp(38px,5.5vw,68px);line-height:1;margin-bottom:36px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.step{background:var(--card);padding:28px 24px}
+.step-n{font-family:var(--display);font-size:56px;color:rgba(200,168,74,.1);line-height:1;margin-bottom:10px}
+.step-t{font-size:15px;font-weight:500;margin-bottom:7px}
+.step-d{font-size:12px;color:var(--text2);line-height:1.7}
+.nations-bg{background:var(--navy);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:80px 24px;position:relative;z-index:1}
+.nations-inner{max-width:1080px;margin:0 auto}
+.nation-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:26px}
+.ntag{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:7px 12px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;transition:all .18s}
+.ntag:hover{border-color:var(--border2);color:var(--text);transform:translateY(-1px)}
+.ntag-f{font-size:17px}
+.nrating{font-family:var(--mono);font-size:9px;padding:2px 5px;border-radius:3px;margin-left:2px}
+.raaa{background:rgba(16,185,129,.15);color:var(--green)}.raa{background:rgba(59,130,246,.15);color:#60a5fa}.ra{background:rgba(245,158,11,.15);color:var(--amber)}.rbbb{background:rgba(245,158,11,.1);color:#d97706}.rbb{background:rgba(239,68,68,.1);color:#f87171}.rb{background:rgba(239,68,68,.15);color:var(--red)}.rccc{background:rgba(180,0,0,.2);color:#ff6666}.rd{background:rgba(120,0,0,.3);color:#ff3333}
+.play-sec{text-align:center;padding:88px 24px;position:relative;z-index:1}
+.play-card{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:52px 40px;max-width:520px;margin:0 auto}
+.play-h{font-family:var(--display);font-size:48px;letter-spacing:.04em;margin-bottom:10px}
+.play-p{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:30px}
+footer{border-top:1px solid var(--border);padding:32px 48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;position:relative;z-index:1}
+.foot-brand{font-family:var(--display);font-size:18px;color:var(--gold);letter-spacing:.1em}
+.foot-note{font-size:11px;color:var(--text3)}
+/* MODALS */
+.overlay{display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:36px 40px;width:92%;max-width:400px;animation:modalIn .25s ease;position:relative}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
+.modal-h{font-family:var(--display);font-size:34px;letter-spacing:.04em;margin-bottom:6px}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.6}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px}
+.field input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:14px;padding:11px 14px;font-family:var(--font);transition:border-color .15s}
+.field input:focus{outline:none;border-color:rgba(200,168,74,.4)}
+.field input.err{border-color:rgba(239,68,68,.5)}
+.field-err{font-size:11px;color:var(--red);margin-top:4px;display:none}
+.modal-btn{width:100%;background:var(--gold);color:var(--bg);font-family:var(--font);font-size:14px;font-weight:500;padding:12px;border-radius:8px;border:none;cursor:pointer;margin-top:6px;transition:all .2s}
+.modal-btn:hover{background:var(--gold2)}
+.modal-btn:disabled{opacity:.5;cursor:not-allowed}
+.modal-switch{font-size:12px;color:var(--text2);text-align:center;margin-top:16px}
+.modal-switch a{color:var(--gold);cursor:pointer}
+.modal-x{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1}
+.modal-x:hover{color:var(--text2)}
+.gen-err{font-size:12px;color:var(--red);text-align:center;margin-bottom:8px;display:none}
+.toast{position:fixed;bottom:24px;right:24px;z-index:999;background:var(--card);border:1px solid var(--border2);border-radius:9px;padding:12px 18px;font-size:13px;display:none;max-width:320px}
+.toast.show{display:block}
+.toast.success{border-color:rgba(16,185,129,.4);color:var(--green)}
+.toast.error{border-color:rgba(239,68,68,.4);color:var(--red)}
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .65s,transform .65s}
+.reveal.in{opacity:1;transform:none}
+@keyframes up{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-brand">MEF</a>
+  <div class="nav-gap"></div>
+  <a href="/leaderboard.html" style="font-size:13px;color:var(--text2);text-decoration:none;padding:6px 12px">Leaderboard</a>
+  <div id="navGuest" style="display:flex;gap:8px">
+    <button class="nav-btn nav-login" onclick="openModal('loginModal')">Sign in</button>
+    <button class="nav-btn nav-signup" onclick="openModal('signupModal')">Sign up free</button>
+  </div>
+  <div class="nav-user" id="navUser">
+    <div class="nav-avatar" id="navAvatar">?</div>
+    <span class="nav-username" id="navUsername"></span>
+    <button class="nav-logout" onclick="logout()">Sign out</button>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-eye">Real 2025 Data · G20 Nations · Multiplayer</div>
+  <h1 class="hero-h1"><span class="t1">Model</span><span class="t2">Economic</span><span class="t3">Forum</span></h1>
+  <p class="hero-p">Manage a real G20 nation. Set interest rates, trade commodities, negotiate deals, survive disasters. The highest Economic Health Score wins.</p>
+  <div class="hero-actions">
+    <button class="btn-gold" onclick="handlePlay()">Play now →</button>
+    <a href="#how" class="btn-outline">How it works</a>
+  </div>
+  <div class="hero-stats">
+    <div class="hstat"><div class="hstat-val">20</div><div class="hstat-lab">Nations</div></div>
+    <div class="hstat"><div class="hstat-val">10</div><div class="hstat-lab">Commodities</div></div>
+    <div class="hstat"><div class="hstat-val">5</div><div class="hstat-lab">Turns</div></div>
+    <div class="hstat"><div class="hstat-val">∞</div><div class="hstat-lab">Strategies</div></div>
+  </div>
+</section>
+
+<section class="sec" id="how">
+  <div class="reveal">
+    <div class="sec-eye">How it works</div>
+    <div class="sec-h2">Four steps to<br>global dominance</div>
+  </div>
+  <div class="steps reveal">
+    <div class="step"><div class="step-n">01</div><div class="step-t">Create an account</div><div class="step-d">Sign up free. Your stats, match history and rankings are saved permanently.</div></div>
+    <div class="step"><div class="step-n">02</div><div class="step-t">Pick your nation</div><div class="step-d">Choose from all 20 G20 members with real 2025 GDP, credit ratings, currencies and unemployment.</div></div>
+    <div class="step"><div class="step-n">03</div><div class="step-t">Set policy & trade</div><div class="step-d">Set interest rates, taxes, spending. Trade 10 commodity types. Impose sanctions. Form alliances.</div></div>
+    <div class="step"><div class="step-n">04</div><div class="step-t">Win the economy</div><div class="step-d">Highest Economic Health Score after 5 turns wins. Combines GDP growth, inflation, debt, unemployment and currency strength.</div></div>
+  </div>
+</section>
+
+<div class="nations-bg">
+  <div class="nations-inner">
+    <div class="reveal">
+      <div class="sec-eye">Playable nations</div>
+      <div class="sec-h2" style="font-size:clamp(34px,4.5vw,56px)">All G20 members<br>real 2025 data</div>
+    </div>
+    <div class="nation-tags reveal">
+      <div class="ntag"><span class="ntag-f">🇺🇸</span>United States<span class="nrating raa">AA+</span></div>
+      <div class="ntag"><span class="ntag-f">🇨🇳</span>China<span class="nrating ra">A+</span></div>
+      <div class="ntag"><span class="ntag-f">🇩🇪</span>Germany<span class="nrating raaa">AAA</span></div>
+      <div class="ntag"><span class="ntag-f">🇯🇵</span>Japan<span class="nrating raa">AA-</span></div>
+      <div class="ntag"><span class="ntag-f">🇮🇳</span>India<span class="nrating rbbb">BBB-</span></div>
+      <div class="ntag"><span class="ntag-f">🇬🇧</span>United Kingdom<span class="nrating raa">AA</span></div>
+      <div class="ntag"><span class="ntag-f">🇫🇷</span>France<span class="nrating raa">AA-</span></div>
+      <div class="ntag"><span class="ntag-f">🇧🇷</span>Brazil<span class="nrating rbb">BB</span></div>
+      <div class="ntag"><span class="ntag-f">🇮🇹</span>Italy<span class="nrating rbbb">BBB</span></div>
+      <div class="ntag"><span class="ntag-f">🇨🇦</span>Canada<span class="nrating raaa">AAA</span></div>
+      <div class="ntag"><span class="ntag-f">🇷🇺</span>Russia<span class="nrating rccc">CCC</span></div>
+      <div class="ntag"><span class="ntag-f">🇰🇷</span>South Korea<span class="nrating raa">AA</span></div>
+      <div class="ntag"><span class="ntag-f">🇦🇺</span>Australia<span class="nrating raaa">AAA</span></div>
+      <div class="ntag"><span class="ntag-f">🇲🇽</span>Mexico<span class="nrating rbbb">BBB-</span></div>
+      <div class="ntag"><span class="ntag-f">🇮🇩</span>Indonesia<span class="nrating rbbb">BBB</span></div>
+      <div class="ntag"><span class="ntag-f">🇹🇷</span>Turkey<span class="nrating rb">B</span></div>
+      <div class="ntag"><span class="ntag-f">🇸🇦</span>Saudi Arabia<span class="nrating ra">A</span></div>
+      <div class="ntag"><span class="ntag-f">🇦🇷</span>Argentina<span class="nrating rd">D</span></div>
+      <div class="ntag"><span class="ntag-f">🇿🇦</span>South Africa<span class="nrating rbb">BB-</span></div>
+      <div class="ntag"><span class="ntag-f">🇪🇺</span>European Union<span class="nrating raa">AA</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="play-sec" id="play">
+  <div class="play-card reveal">
+    <div class="play-h">Ready to play?</div>
+    <div class="play-p">Create a free account to start. Then create a game room and share the code with friends.</div>
+    <button class="btn-gold" style="width:100%;font-size:14px;padding:14px" onclick="handlePlay()">Create account & play →</button>
+  </div>
+</div>
+
+<footer>
+  <div class="foot-brand">MEF</div>
+  <div class="foot-note">Model Economic Forum · 2025 G20 data · Free to play</div>
+  <div class="foot-note"><a href="/leaderboard.html" style="color:var(--text3);text-decoration:none">Leaderboard</a></div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<!-- SIGN UP -->
+<div class="overlay" id="signupModal" onclick="if(event.target===this)closeModal('signupModal')">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('signupModal')">×</button>
+    <div class="modal-h">Sign up</div>
+    <div class="modal-sub">Create your free account.</div>
+    <div class="gen-err" id="su-err"></div>
+    <div class="field"><label>Username</label><input type="text" id="su-user" placeholder="e.g. trader99" maxlength="20"><div class="field-err" id="su-user-err"></div></div>
+    <div class="field"><label>Email</label><input type="email" id="su-email" placeholder="your@email.com"><div class="field-err" id="su-email-err"></div></div>
+    <div class="field"><label>Password</label><input type="password" id="su-pass" placeholder="At least 6 characters"><div class="field-err" id="su-pass-err"></div></div>
+    <button class="modal-btn" id="su-btn" onclick="submitSignup()">Create account →</button>
+    <div class="modal-switch">Already have an account? <a onclick="switchModal('signupModal','loginModal')">Sign in</a></div>
+  </div>
+</div>
+
+<!-- SIGN IN -->
+<div class="overlay" id="loginModal" onclick="if(event.target===this)closeModal('loginModal')">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('loginModal')">×</button>
+    <div class="modal-h">Sign in</div>
+    <div class="modal-sub">Welcome back.</div>
+    <div class="gen-err" id="li-err"></div>
+    <div class="field"><label>Email</label><input type="email" id="li-email" placeholder="your@email.com"><div class="field-err" id="li-email-err"></div></div>
+    <div class="field"><label>Password</label><input type="password" id="li-pass" placeholder="Your password"><div class="field-err" id="li-pass-err"></div></div>
+    <button class="modal-btn" id="li-btn" onclick="submitLogin()">Sign in →</button>
+    <div class="modal-switch">No account? <a onclick="switchModal('loginModal','signupModal')">Sign up free</a></div>
+  </div>
+</div>
+
+<script>
+let currentUser = null;
+
+async function init() {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    if (res.ok) { const d = await res.json(); setUser(d.user); }
+  } catch(e) {}
+}
+
+function setUser(user) {
+  currentUser = user;
+  document.getElementById('navGuest').style.display = 'none';
+  const nu = document.getElementById('navUser'); nu.style.display = 'flex';
+  document.getElementById('navAvatar').textContent = user.username[0].toUpperCase();
+  document.getElementById('navUsername').textContent = user.username;
+}
+
+function clearUser() {
+  currentUser = null;
+  document.getElementById('navGuest').style.display = 'flex';
+  document.getElementById('navUser').style.display = 'none';
+}
+
+function handlePlay() {
+  if (!currentUser) { openModal('signupModal'); return; }
+  if (currentUser.isAdmin) { window.location.href = '/admin.html'; return; }
+  window.location.href = '/lobby.html';
+}
+
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  setTimeout(() => { const i = document.querySelector('#'+id+' input'); if(i) i.focus(); }, 80);
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function switchModal(a, b) { closeModal(a); setTimeout(() => openModal(b), 120); }
+
+function showErr(id, msg) { const e=document.getElementById(id); if(e){e.textContent=msg;e.style.display='block';} }
+function clearErrs(prefix) {
+  ['err','user-err','email-err','pass-err'].forEach(s => { const e=document.getElementById(prefix+'-'+s); if(e){e.style.display='none';e.textContent='';} });
+  document.querySelectorAll('#'+prefix.split('-')[0]+'Modal input').forEach(i=>i.classList.remove('err'));
+}
+
+async function submitSignup() {
+  clearErrs('su');
+  const username = document.getElementById('su-user').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const password = document.getElementById('su-pass').value;
+  if (!username) { showErr('su-user-err','Username required'); return; }
+  if (!email) { showErr('su-email-err','Email required'); return; }
+  if (!password) { showErr('su-pass-err','Password required'); return; }
+  const btn = document.getElementById('su-btn'); btn.disabled=true; btn.textContent='Creating…';
+  try {
+    const res = await fetch('/api/auth/register', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({username,email,password}) });
+    const data = await res.json();
+    if (!res.ok) {
+      const m = data.error||'Error';
+      if (m.toLowerCase().includes('username')) showErr('su-user-err',m);
+      else if (m.toLowerCase().includes('email')) showErr('su-email-err',m);
+      else if (m.toLowerCase().includes('password')) showErr('su-pass-err',m);
+      else showErr('su-err',m);
+    } else {
+      setUser(data.user); closeModal('signupModal');
+      showToast('Welcome, '+data.user.username+'! 🎉','success');
+      setTimeout(()=>{ if(data.user.isAdmin) window.location.href='/admin.html'; else window.location.href='/lobby.html'; }, 800);
+    }
+  } catch(e) { showErr('su-err','Cannot connect to server'); }
+  btn.disabled=false; btn.textContent='Create account →';
+}
+
+async function submitLogin() {
+  clearErrs('li');
+  const email = document.getElementById('li-email').value.trim();
+  const password = document.getElementById('li-pass').value;
+  if (!email) { showErr('li-email-err','Email required'); return; }
+  if (!password) { showErr('li-pass-err','Password required'); return; }
+  const btn = document.getElementById('li-btn'); btn.disabled=true; btn.textContent='Signing in…';
+  try {
+    const res = await fetch('/api/auth/login', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body:JSON.stringify({email,password}) });
+    const data = await res.json();
+    if (!res.ok) {
+      const m = data.error||'Error';
+      if (m.toLowerCase().includes('email')) showErr('li-email-err',m);
+      else if (m.toLowerCase().includes('password')) showErr('li-pass-err',m);
+      else showErr('li-err',m);
+    } else {
+      setUser(data.user); closeModal('loginModal');
+      showToast('Welcome back, '+data.user.username+'!','success');
+      setTimeout(()=>{ if(data.user.isAdmin) window.location.href='/admin.html'; else window.location.href='/lobby.html'; }, 800);
+    }
+  } catch(e) { showErr('li-err','Cannot connect to server'); }
+  btn.disabled=false; btn.textContent='Sign in →';
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method:'POST', credentials:'include' });
+  clearUser(); showToast('Signed out','success');
+}
+
+let toastTimer;
+function showToast(msg, type='success') {
+  const el=document.getElementById('toast'); el.textContent=msg; el.className='toast show '+type;
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),3500);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') document.querySelectorAll('.overlay.open').forEach(el=>el.classList.remove('open'));
+  if (e.key==='Enter') {
+    if (document.getElementById('signupModal').classList.contains('open')) submitSignup();
+    if (document.getElementById('loginModal').classList.contains('open')) submitLogin();
+  }
+});
+
+const obs = new IntersectionObserver(entries => entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); }), {threshold:0.1});
+document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
+document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();document.querySelector(a.getAttribute('href'))?.scrollIntoView({behavior:'smooth'});}));
+
+init();
+</script>
+</body>
+</html>

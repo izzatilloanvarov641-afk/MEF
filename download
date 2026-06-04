@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEF — Game</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#06080f;--navy:#0a0f1c;--card:#0d1220;--card2:#111827;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e4e9f5;--text2:#6b7589;--text3:#2e3547;--gold:#c8a84a;--gold2:#e2c46a;--green:#10b981;--red:#ef4444;--amber:#f59e0b;--purple:#8b5cf6;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--display:'Bebas Neue',sans-serif}
+html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--text)}
+
+/* LAYOUT */
+#app{display:grid;grid-template-columns:200px 1fr 220px;grid-template-rows:50px 3px 1fr;height:100vh;width:100vw;position:fixed;inset:0}
+.topbar{grid-column:1/-1;grid-row:1;background:var(--navy);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:0 14px}
+.turn-bar{grid-column:1/-1;grid-row:2;background:var(--card);height:3px}
+.turn-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--purple));transition:width .4s}
+.sidebar-left{grid-row:3;background:var(--navy);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.main{grid-row:3;overflow-y:auto;background:var(--bg);padding:14px;display:flex;flex-direction:column;gap:12px}
+.main::-webkit-scrollbar{width:4px}
+.main::-webkit-scrollbar-thumb{background:var(--border2)}
+.sidebar-right{grid-row:3;background:var(--navy);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+
+/* TOPBAR */
+.tb-brand{font-family:var(--display);font-size:17px;color:var(--gold);letter-spacing:.1em}
+.tb-div{width:1px;height:16px;background:var(--border)}
+.tb-flag{font-size:18px}
+.tb-name{font-size:12px;font-weight:500}
+.q-badge{background:rgba(200,168,74,.12);color:var(--gold);border:1px solid rgba(200,168,74,.25);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px}
+.spacer{flex:1}
+.score-lbl{font-size:10px;color:var(--text2)}
+.score-val{font-size:13px;font-weight:500;font-family:var(--mono)}
+.score-val.pos{color:var(--green)}.score-val.neg{color:var(--red)}
+.ready-badge{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25);font-size:10px;padding:2px 8px;border-radius:4px;font-family:var(--mono)}
+.end-btn{background:var(--gold);color:var(--bg);border:none;border-radius:7px;padding:7px 16px;font-size:12px;font-family:var(--font);font-weight:500;cursor:pointer;transition:all .2s}
+.end-btn:hover{background:var(--gold2)}
+.end-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* LEFT SIDEBAR */
+.sb-sec{padding:8px 12px;border-bottom:1px solid var(--border)}
+.sb-lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.lb-list{flex:1;overflow-y:auto}
+.lb-row{display:flex;align-items:center;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s}
+.lb-row:hover{background:var(--card)}
+.lb-row.me{background:rgba(200,168,74,.06)}
+.lb-rank{font-size:9px;color:var(--text3);width:12px;font-family:var(--mono)}
+.lb-flag{font-size:14px;width:16px}
+.lb-name{font-size:11px;flex:1}
+.lb-ehs{font-size:10px;font-family:var(--mono);font-weight:500}
+.lb-ehs.pos{color:var(--green)}.lb-ehs.neg{color:var(--red)}
+
+/* MAIN CARDS */
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.card-title{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.metrics{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.mc{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px}
+.mc-lbl{font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.mc-val{font-size:13px;font-weight:500;font-family:var(--mono)}
+.mc-ch{font-size:8px;margin-top:2px;font-family:var(--mono)}
+.mc-ch.pos{color:var(--green)}.mc-ch.neg{color:var(--red)}
+
+/* TABS */
+.tab-row{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:12px}
+.tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text2);font-size:11px;font-family:var(--font);padding:5px 10px 7px;cursor:pointer;transition:all .15s;margin-bottom:-1px}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* SLIDERS */
+.sl-row{margin-bottom:12px}
+.sl-lbl{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:4px}
+.sl-lbl span{color:var(--text);font-family:var(--mono);font-weight:500}
+input[type=range]{width:100%;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--card2);outline:none;border:1px solid var(--border2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--gold);cursor:pointer;border:2px solid var(--card)}
+.sl-note{font-size:9px;color:var(--text3);margin-top:2px}
+
+/* TABLES */
+.dtbl{width:100%;border-collapse:collapse;font-size:11px}
+.dtbl th{text-align:left;color:var(--text3);font-weight:400;padding:3px 0;border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase;letter-spacing:.06em}
+.dtbl td{padding:5px 0;border-bottom:1px solid var(--border);color:var(--text2)}
+.dtbl td:last-child{text-align:right;color:var(--text);font-family:var(--mono)}
+.dtbl tr:last-child td{border:none}
+
+/* COMMODITIES */
+.comm-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:12px}
+.comm-card{border-radius:8px;padding:9px;border:1px solid var(--border);position:relative;background:var(--card2)}
+.comm-icon{font-size:16px;margin-bottom:4px}
+.comm-name{font-size:9px;font-weight:500;margin-bottom:2px}
+.comm-price{font-size:13px;font-weight:500;font-family:var(--mono)}
+.comm-stock{font-size:9px;color:var(--text2);margin-top:2px}
+.comm-trend{position:absolute;top:7px;right:7px;font-size:9px;font-family:var(--mono)}
+.comm-trend.up{color:var(--green)}.comm-trend.down{color:var(--red)}
+
+/* MARKET */
+.offer-row{background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:8px 11px;margin-bottom:6px;display:flex;align-items:center;gap:8px;font-size:11px}
+.offer-info{flex:1}
+.offer-title{font-weight:500;margin-bottom:2px}
+.offer-detail{font-size:10px;color:var(--text2)}
+.btn-xs{border:none;border-radius:5px;padding:4px 10px;font-size:10px;font-family:var(--font);cursor:pointer}
+.btn-buy{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25)}
+.btn-cancel{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25)}
+.form-row{display:flex;gap:7px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fg label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+.fg select,.fg input{background:var(--card);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 8px;font-family:var(--font)}
+.fg input{width:90px}
+.btn-sm{background:var(--gold);color:var(--bg);border:none;border-radius:6px;padding:5px 12px;font-size:11px;font-family:var(--font);cursor:pointer}
+
+/* GEOPOLITICS */
+.geo-btn{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:6px;padding:6px 12px;font-size:11px;font-family:var(--font);cursor:pointer;transition:all .15s;margin:3px}
+.geo-btn:hover{border-color:var(--gold);color:var(--gold)}
+.geo-btn.active{background:rgba(200,168,74,.12);border-color:var(--gold);color:var(--gold)}
+.sanction-active{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:7px;padding:7px 10px;font-size:11px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between}
+.alliance-active{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:7px;padding:7px 10px;font-size:11px;margin-bottom:5px}
+
+/* CHARTS */
+.hchart{height:110px;position:relative}
+
+/* RIGHT SIDEBAR */
+.players-panel{padding:8px 12px;border-bottom:1px solid var(--border)}
+.pchip{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px}
+.pchip:last-child{border:none}
+.pchip-flag{font-size:13px}
+.pchip-name{flex:1}
+.pchip-ready{font-size:9px;font-family:var(--mono)}
+.chat-area{flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:3px}
+.chat-area::-webkit-scrollbar{width:3px}
+.chat-area::-webkit-scrollbar-thumb{background:var(--border2)}
+.cmsg{font-size:11px;color:var(--text2);line-height:1.5}
+.cmsg strong{color:var(--text)}
+.cmsg.sys{color:var(--text3);font-style:italic}
+.chat-input{padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:6px}
+.chat-input input{flex:1;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:5px 8px;font-family:var(--font)}
+.chat-input button{background:var(--gold);color:var(--bg);border:none;border-radius:5px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:var(--font)}
+
+/* MODALS */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:24px 28px;max-width:420px;width:92%}
+.modal h3{font-family:var(--display);font-size:26px;letter-spacing:.04em;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.6}
+.modal-field{margin-bottom:10px}
+.modal-field label{display:block;font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.modal-field input,.modal-field select,.modal-field textarea{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:13px;padding:8px 11px;font-family:var(--font)}
+.modal-field textarea{height:100px;resize:vertical}
+.modal-btns{display:flex;gap:8px;margin-top:14px;justify-content:flex-end}
+.modal-cancel{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:7px;padding:8px 16px;font-size:12px;font-family:var(--font);cursor:pointer}
+.modal-ok{background:var(--gold);color:var(--bg);border:none;border-radius:7px;padding:8px 20px;font-size:12px;font-weight:500;font-family:var(--font);cursor:pointer}
+
+/* DEBT BAR */
+.debt-bar{height:4px;background:var(--card2);border-radius:2px;overflow:hidden;margin-top:4px}
+.debt-fill{height:100%;border-radius:2px;transition:width .4s}
+
+/* EHS SCORE */
+.ehs-big{font-family:var(--display);font-size:48px;letter-spacing:.04em;line-height:1}
+.ehs-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-top:4px}
+
+/* END SCREEN */
+#endScreen{display:none;position:fixed;inset:0;background:rgba(6,8,15,.95);z-index:600;align-items:center;justify-content:center;flex-direction:column}
+#endScreen.show{display:flex}
+.end-box{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:36px 44px;max-width:500px;text-align:center}
+.end-podium{display:flex;justify-content:center;gap:10px;margin:14px 0}
+.end-place{background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:12px 10px;text-align:center;min-width:120px}
+.end-place.gold{border-color:var(--gold);background:rgba(200,168,74,.08)}
+.notice{background:rgba(200,168,74,.08);border:1px solid rgba(200,168,74,.2);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--gold);margin-bottom:10px}
+
+/* DISASTER ALERT */
+.disaster-alert{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--card);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:12px 20px;font-size:13px;color:var(--red);z-index:400;display:none;text-align:center;max-width:400px}
+.disaster-alert.show{display:block;animation:alertIn .3s ease}
+@keyframes alertIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* LOAN NOTIFICATION */
+.loan-notif{position:fixed;bottom:20px;left:20px;background:var(--card);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:14px 18px;font-size:12px;z-index:400;display:none;max-width:300px}
+.loan-notif.show{display:block}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="topbar">
+    <span class="tb-brand">MEF</span>
+    <div class="tb-div"></div>
+    <span class="tb-flag" id="topFlag">🌐</span>
+    <span class="tb-name" id="topName">Loading…</span>
+    <span class="q-badge" id="topTurn">Turn 1</span>
+    <div class="spacer"></div>
+    <span class="score-lbl">EHS&nbsp;</span>
+    <span class="score-val pos" id="topEhs">—</span>
+    <div class="tb-div"></div>
+    <span id="readyBadge" class="ready-badge" style="display:none">✓ Submitted</span>
+    <button class="end-btn" id="endTurnBtn" onclick="openJustification()">End turn →</button>
+  </div>
+  <div class="turn-bar"><div class="turn-fill" id="turnFill" style="width:0%"></div></div>
+
+  <div class="sidebar-left">
+    <div class="sb-sec"><div class="sb-lbl">Rankings (EHS)</div></div>
+    <div class="lb-list" id="lbList"></div>
+  </div>
+
+  <div class="main" id="mainPanel">
+    <div style="color:var(--text2);font-size:14px;text-align:center;margin-top:40px">Loading game…</div>
+  </div>
+
+  <div class="sidebar-right">
+    <div class="players-panel">
+      <div class="sb-lbl" style="padding:8px 0 4px">Players</div>
+      <div id="playerChips"></div>
+    </div>
+    <div style="padding:6px 12px 4px;border-bottom:1px solid var(--border)"><div class="sb-lbl">Chat</div></div>
+    <div class="chat-area" id="chatArea"></div>
+    <div class="chat-input">
+      <input type="text" id="chatInput" placeholder="Message…" maxlength="200" onkeydown="if(event.key==='Enter')sendChat()">
+      <button onclick="sendChat()">→</button>
+    </div>
+  </div>
+</div>
+
+<!-- END SCREEN -->
+<div id="endScreen">
+  <div class="end-box">
+    <div style="font-size:36px;margin-bottom:10px">🏆</div>
+    <div style="font-family:var(--display);font-size:36px;letter-spacing:.04em;margin-bottom:6px" id="endTitle">Game Over</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Final Economic Health Scores</div>
+    <div class="end-podium" id="endPodium"></div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:18px" id="endBody"></div>
+    <button class="end-btn" onclick="window.location.href='/'">Back to home</button>
+  </div>
+</div>
+
+<!-- JUSTIFICATION MODAL -->
+<div class="modal-overlay" id="justModal">
+  <div class="modal">
+    <h3>Policy justification</h3>
+    <p>Explain your policy decisions this turn (min 50 words). The Admin reviews this and awards bonus EHS points for well-reasoned arguments.</p>
+    <div class="modal-field">
+      <label>Your justification</label>
+      <textarea id="justText" placeholder="Explain why you set these policy rates. Reference economic theory, your country's situation, global events…"></textarea>
+    </div>
+    <div style="font-size:10px;color:var(--text3)" id="justWordCount">0 words</div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('justModal')">Cancel</button>
+      <button class="modal-ok" onclick="submitTurn()">Submit turn →</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEGOTIATE MODAL -->
+<div class="modal-overlay" id="negModal">
+  <div class="modal">
+    <h3>Negotiate trade</h3>
+    <p id="negSub"></p>
+    <div class="modal-field"><label>Your price per unit</label><input type="number" id="negPrice"></div>
+    <div class="modal-field"><label>Volume</label><input type="number" id="negVol" min="1"></div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:4px" id="negTotal"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('negModal')">Cancel</button>
+      <button class="modal-ok" onclick="sendProposal()">Send proposal →</button>
+    </div>
+  </div>
+</div>
+
+<!-- INCOMING TRADE MODAL -->
+<div class="modal-overlay" id="tradeModal">
+  <div class="modal">
+    <h3>Incoming proposal</h3>
+    <div id="tradeDetails" style="font-size:12px;color:var(--text2);line-height:2;margin-bottom:14px"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" style="color:var(--red);border-color:rgba(239,68,68,.3)" onclick="rejectTrade()">✗ Reject</button>
+      <button class="modal-ok" onclick="acceptTrade()">✓ Accept</button>
+    </div>
+  </div>
+</div>
+
+<!-- SANCTION MODAL -->
+<div class="modal-overlay" id="sanctionModal">
+  <div class="modal">
+    <h3>Impose sanctions</h3>
+    <p>State your reason. This will be announced to all players.</p>
+    <div class="modal-field"><label>Target country</label><select id="sanctionTarget"></select></div>
+    <div class="modal-field"><label>Reason</label><input type="text" id="sanctionReason" placeholder="e.g. Violation of trade agreement" maxlength="150"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('sanctionModal')">Cancel</button>
+      <button class="modal-ok" style="background:var(--red);color:#fff" onclick="submitSanction()">Impose →</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOAN REQUEST MODAL -->
+<div class="modal-overlay" id="loanModal">
+  <div class="modal">
+    <h3>Request World Bank loan</h3>
+    <p>The Admin (World Bank) will review your request. Interest rate is based on your credit rating.</p>
+    <div class="modal-field"><label>Amount ($B)</label><input type="number" id="loanAmount" min="1" max="500" placeholder="e.g. 100"></div>
+    <div class="modal-field"><label>Purpose (min 30 words)</label><textarea id="loanPurpose" style="height:80px" placeholder="Explain what you will use this loan for…"></textarea></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('loanModal')">Cancel</button>
+      <button class="modal-ok" onclick="submitLoan()">Submit request →</button>
+    </div>
+  </div>
+</div>
+
+<div class="disaster-alert" id="disasterAlert"></div>
+<div class="loan-notif" id="loanNotif"></div>
+
+<script>
+const COMMODITIES=[{id:'oil',name:'Oil',icon:'🛢'},{id:'gas',name:'Natural Gas',icon:'🔥'},{id:'coal',name:'Coal',icon:'⚫'},{id:'food',name:'Food',icon:'🌾'},{id:'minerals',name:'Minerals',icon:'⛏'},{id:'tech',name:'Technology',icon:'💡'},{id:'manufacturing',name:'Manufacturing',icon:'⚙️'},{id:'pharma',name:'Pharma',icon:'💊'},{id:'finance',name:'Finance',icon:'💰'},{id:'tourism',name:'Tourism',icon:'✈️'}];
+const G20_NAMES={us:'United States',cn:'China',de:'Germany',jp:'Japan',in:'India',uk:'United Kingdom',fr:'France',br:'Brazil',it:'Italy',ca:'Canada',ru:'Russia',kr:'South Korea',au:'Australia',mx:'Mexico',id:'Indonesia',tr:'Turkey',sa:'Saudi Arabia',ar:'Argentina',za:'South Africa',eu:'European Union'};
+
+let socket,myUser,gameState=null,viewId=null,activeChart=null;
+let myPolicy={},negOffer=null,incomingTrade=null;
+
+const roomCode = new URLSearchParams(window.location.search).get('room');
+
+async function init() {
+  const res=await fetch('/api/auth/me',{credentials:'include'});
+  if(!res.ok){window.location.href='/';return;}
+  const data=await res.json();myUser=data.user;
+  if(myUser.isAdmin){window.location.href='/admin.html?room='+roomCode;return;}
+  connectSocket();
+}
+
+function connectSocket(){
+  const token=document.cookie.split('mef_token=')[1]?.split(';')[0];
+  socket=io({auth:{token}});
+  socket.on('connect',()=>{
+    if(roomCode)socket.emit('joinRoom',{code:roomCode,name:myUser.username},res=>{
+      if(!res.success){alert('Could not join room: '+res.error);window.location.href='/';}
+    });
+  });
+  socket.on('stateUpdate',state=>{gameState=state;renderAll();});
+  socket.on('turnAdvanced',({turn})=>{ appendChat({name:'System',text:`⚙ Turn ${turn-1} complete. Turn ${turn} begins!`,system:true}); document.getElementById('readyBadge').style.display='none'; document.getElementById('endTurnBtn').disabled=false; myPolicy={}; if(activeChart){activeChart.destroy();activeChart=null;} });
+  socket.on('playerReady',({name})=>appendChat({name:'System',text:`${name} submitted their turn`,system:true}));
+  socket.on('gameEnded',()=>showEndScreen());
+  socket.on('tradeProposal',p=>{incomingTrade=p;showTradeModal(p);});
+  socket.on('tradeAccepted',()=>{closeModal('negModal');appendChat({name:'System',text:'✓ Trade accepted!',system:true});});
+  socket.on('tradeRejected',({reason})=>{closeModal('negModal');appendChat({name:'System',text:'✗ Trade rejected.'+(reason?' '+reason:''),system:true});});
+  socket.on('disasterStruck',({countryName,disasterName,countryFlag})=>showDisasterAlert(`🌪 ${countryFlag} ${countryName} hit by ${disasterName}!`));
+  socket.on('loanApproved',({amount,interestRate,note})=>showLoanNotif(`✓ Loan approved! $${amount}B at ${interestRate}% interest.${note?' Note: '+note:''}`,'success'));
+  socket.on('loanRejected',({note})=>showLoanNotif(`✗ Loan rejected.${note?' Reason: '+note:''}`,'error'));
+  socket.on('allianceProposal',({fromName,fromFlag,fromSocketId})=>{
+    if(confirm(`${fromFlag} ${fromName} wants to form an alliance. Accept?`))socket.emit('acceptAlliance',{fromSocketId});
+  });
+  socket.on('justificationFeedback',({score,feedback,turn})=>showLoanNotif(`📋 Admin scored your Turn ${turn} justification: ${score}/10.${feedback?' "'+feedback+'"':''}`,'success'));
+  socket.on('chat',msg=>appendChat(msg));
+}
+
+function myPlayer(){return gameState?.players.find(p=>p.socketId===socket?.id);}
+function getC(id){return gameState?.countries.find(c=>c.id===id);}
+
+function renderAll(){
+  if(!gameState)return;
+  const me=myPlayer();
+  if(!me)return;
+  const c=getC(me.countryId);
+  if(!c)return;
+  if(!viewId)viewId=me.countryId;
+  updateTopbar(me,c);
+  renderLeaderboard();
+  renderPlayerChips();
+  renderMain();
+}
+
+function updateTopbar(me,c){
+  document.getElementById('topFlag').textContent=c.flag;
+  document.getElementById('topName').textContent=me.name+' · '+c.name;
+  document.getElementById('topTurn').textContent=`Turn ${gameState.turn} of ${gameState.maxTurns}`;
+  document.getElementById('turnFill').style.width=(gameState.turn/gameState.maxTurns*100)+'%';
+  const lastEhs=me.ehs?.[me.ehs.length-1]??'—';
+  const ehsEl=document.getElementById('topEhs');
+  ehsEl.textContent=lastEhs==='—'?'—':lastEhs;
+  ehsEl.className='score-val '+(lastEhs>60?'pos':'neg');
+}
+
+function renderLeaderboard(){
+  const sorted=[...gameState.players].sort((a,b)=>{
+    const ae=a.ehs?.[a.ehs.length-1]??0;const be=b.ehs?.[b.ehs.length-1]??0;return be-ae;
+  });
+  const el=document.getElementById('lbList');el.innerHTML='';
+  sorted.forEach((p,i)=>{
+    const c=getC(p.countryId);if(!c)return;
+    const ehs=p.ehs?.[p.ehs.length-1]??'—';
+    const isMe=p.socketId===socket?.id;
+    const row=document.createElement('div');row.className='lb-row'+(isMe?' me':'');
+    row.innerHTML=`<span class="lb-rank">${i+1}</span><span class="lb-flag">${c.flag}</span><span class="lb-name">${p.name}</span><span class="lb-ehs ${ehs>60?'pos':'neg'}">${ehs}</span>`;
+    row.onclick=()=>{viewId=c.id;if(activeChart){activeChart.destroy();activeChart=null;}renderMain();};
+    el.appendChild(row);
+  });
+}
+
+function renderPlayerChips(){
+  document.getElementById('playerChips').innerHTML=gameState.players.map(p=>{
+    const c=getC(p.countryId);const isMe=p.socketId===socket?.id;
+    return `<div class="pchip"><span class="pchip-flag">${c?.flag||'?'}</span><span class="pchip-name" style="${isMe?'font-weight:500':''}">${p.name}${isMe?' (you)':''}</span><span class="pchip-ready" style="color:${p.ready?'var(--green)':'var(--text3)'}">${p.ready?'✓':''}</span></div>`;
+  }).join('');
+}
+
+function renderMain(){
+  if(!gameState||!viewId)return;
+  if(activeChart){activeChart.destroy();activeChart=null;}
+  const c=getC(viewId);if(!c)return;
+  const me=myPlayer();const isMe=viewId===me?.countryId;
+  const vp=gameState.players.find(p=>p.countryId===viewId);
+  const startCap=vp?vp.gdpCapStart:c._history?.[0]||c.gdpCap;
+  const capG=((c.gdpCap-startCap)/startCap*100).toFixed(1);
+  const lastEhs=vp?.ehs?.[vp.ehs.length-1]??'—';
+
+  document.getElementById('mainPanel').innerHTML=`
+  ${isMe?`<div class="notice">⚡ Your nation — set policy below then click "End turn" to submit.</div>`:''}
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span style="font-size:30px">${c.flag}</span>
+      <div>
+        <div style="font-size:17px;font-weight:600">${c.name}</div>
+        <div style="font-size:11px;color:var(--text2)">${vp?vp.name+' · Human':'AI-controlled'} · ${c.currency}${vp?` · Budget: $${vp.budget?.toFixed(0)}B`:''}</div>
+      </div>
+      ${isMe?`<div style="margin-left:auto;background:rgba(200,168,74,.1);border:1px solid rgba(200,168,74,.25);color:var(--gold);font-size:9px;padding:3px 9px;border-radius:4px;font-family:var(--mono)">YOUR NATION</div>`:''}
+    </div>
+    <div class="metrics">
+      ${mc('GDP','$'+(c.gdp/1000).toFixed(1)+'T',null)}
+      ${mc('GDP/cap','$'+Math.round(c.gdpCap).toLocaleString(),capG+'%')}
+      ${mc('Growth',c.growth?.toFixed(1)+'%',null,c.growth<0?'var(--red)':c.growth>4?'var(--green)':'var(--text)')}
+      ${mc('Inflation',c.inflation?.toFixed(1)+'%',null,c.inflation>8?'var(--red)':c.inflation<1?'var(--amber)':'var(--green)')}
+      ${mc('Unemployment',(c.unemployment||0).toFixed(1)+'%',null,c.unemployment>15?'var(--red)':c.unemployment>8?'var(--amber)':'var(--green)')}
+      ${mc('Credit',c.creditLabel||'—',null,c.creditScore>=9?'var(--green)':c.creditScore>=7?'var(--amber)':'var(--red)')}
+      ${mc('EHS',lastEhs,null,lastEhs>60?'var(--green)':lastEhs>40?'var(--amber)':'var(--red)')}
+    </div>
+  </div>
+  <div class="card" style="padding:14px 16px 0">
+    <div class="tab-row">
+      <button class="tab active" id="tab-overview" onclick="switchTab('overview')">Overview</button>
+      <button class="tab" id="tab-economics" onclick="switchTab('economics')">Economics</button>
+      ${isMe?`<button class="tab" id="tab-policy" onclick="switchTab('policy')">Policy</button>`:''}
+      <button class="tab" id="tab-commodities" onclick="switchTab('commodities')">Commodities</button>
+      ${isMe?`<button class="tab" id="tab-market" onclick="switchTab('market')">Trade Market</button>`:''}
+      <button class="tab" id="tab-geo" onclick="switchTab('geo')">Geopolitics</button>
+      <button class="tab" id="tab-log" onclick="switchTab('log')">Event log</button>
+    </div>
+    <div style="padding-bottom:14px">
+      <div class="tab-panel active" id="panel-overview">${renderOverview(c,vp,isMe)}</div>
+      <div class="tab-panel" id="panel-economics">${renderEconomics(c)}</div>
+      ${isMe?`<div class="tab-panel" id="panel-policy">${renderPolicy(c)}</div>`:''}
+      <div class="tab-panel" id="panel-commodities">${renderCommodities(c,vp,isMe)}</div>
+      ${isMe?`<div class="tab-panel" id="panel-market">${renderMarket(isMe)}</div>`:''}
+      <div class="tab-panel" id="panel-geo">${renderGeo(c,isMe)}</div>
+      <div class="tab-panel" id="panel-log">${renderLog()}</div>
+    </div>
+  </div>`;
+  setTimeout(()=>buildChart(c,vp),30);
+}
+
+function mc(label,val,change,col){
+  const sign=parseFloat(change)>=0?'+':'';
+  return `<div class="mc"><div class="mc-lbl">${label}</div><div class="mc-val" style="${col?'color:'+col:''}">${val}</div>${change!==null&&change!==undefined?`<div class="mc-ch ${parseFloat(change)>=0?'pos':'neg'}">${sign}${change}</div>`:''}</div>`;
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  const t=document.getElementById('tab-'+name);const p=document.getElementById('panel-'+name);
+  if(t)t.classList.add('active');if(p)p.classList.add('active');
+  if(name==='overview'&&!activeChart){const c=getC(viewId);const vp=gameState?.players.find(p=>p.countryId===viewId);setTimeout(()=>buildChart(c,vp),20);}
+}
+
+function renderOverview(c,vp,isMe){
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">
+    <div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Economic indicators</div>
+      <table class="dtbl">
+        <tr><td>GDP total</td><td>$${(c.gdp/1000).toFixed(2)}T</td></tr>
+        <tr><td>Exports</td><td>$${Math.round(c.exports).toLocaleString()}B</td></tr>
+        <tr><td>Imports</td><td>$${Math.round(c.imports).toLocaleString()}B</td></tr>
+        <tr><td>Net exports</td><td style="color:${c.exports-c.imports>=0?'var(--green)':'var(--red)'}">${c.exports-c.imports>=0?'+':''}$${Math.round(c.exports-c.imports).toLocaleString()}B</td></tr>
+        <tr><td>Debt/GDP</td><td style="color:${c.debt>100?'var(--red)':c.debt>60?'var(--amber)':'var(--green)'}">${c.debt?.toFixed(0)}%</td></tr>
+        <tr><td>Interest rate</td><td>${c.interest?.toFixed(2)}%</td></tr>
+        <tr><td>Net FDI</td><td style="color:${c.fdi>=0?'var(--green)':'var(--red)'}">${c.fdi>=0?'+':''}$${c.fdi?.toFixed(1)}B</td></tr>
+      </table>
+      ${isMe&&vp?.loans?.length?`<div style="margin-top:12px;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Active loans</div>
+      ${vp.loans.filter(l=>l.active).map(l=>`<div style="background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:11px;margin-bottom:5px">$${l.amount}B at ${l.interestRate}% · ${l.turnsLeft} turn(s) left</div>`).join('')}`:''}
+    </div>
+    <div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">GDP/cap history</div>
+      <div class="hchart"><canvas id="histChart"></canvas></div>
+      ${isMe?`<button class="btn-xs" style="background:rgba(200,168,74,.1);color:var(--gold);border:1px solid rgba(200,168,74,.2);margin-top:8px;width:100%" onclick="openModal('loanModal')">🏦 Request World Bank loan</button>`:''}
+    </div>
+  </div>`;
+}
+
+function renderEconomics(c){
+  const cs=c.creditScore||5;const spreadMap={10:0,9:0.2,8:0.5,7:1.0,6:2.0,5:3.5,4:5.5,3:8.0,2:12.0,1:18.0};
+  const bc=((c.interest||0)+(spreadMap[Math.round(cs)]||5)).toFixed(2);
+  const creditCol=cs>=9?'var(--green)':cs>=7?'var(--amber)':'var(--red)';
+  const fxCol=c.currencyStrength<60?'var(--red)':c.currencyStrength<80?'var(--amber)':'var(--green)';
+  const uCol=c.unemployment>15?'var(--red)':c.unemployment>8?'var(--amber)':'var(--green)';
+  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px">
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Credit rating</div>
+      <div style="font-family:var(--display);font-size:28px;color:${creditCol};margin-bottom:4px">${c.creditLabel||'—'}</div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:8px">${cs>=9?'Prime/High grade':cs>=7?'Investment grade':cs>=5?'Speculative':'Near/In default'}</div>
+      <div style="font-size:10px;color:var(--text3)">Borrowing cost</div>
+      <div style="font-size:15px;font-weight:500;font-family:var(--mono);color:${parseFloat(bc)>8?'var(--red)':parseFloat(bc)>5?'var(--amber)':'var(--green)'}">${bc}%</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">Policy rate + credit spread</div>
+    </div>
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Currency</div>
+      <div style="font-family:var(--display);font-size:28px;color:${fxCol};margin-bottom:4px">${Math.round(c.currencyStrength||100)}</div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:8px">Strength index (100=base)</div>
+      <div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${Math.min(c.currencyStrength||100,200)/200*100}%;background:${fxCol};border-radius:2px"></div></div>
+      <table class="dtbl">
+        <tr><td>Currency</td><td>${c.currency}</td></tr>
+        <tr><td>FX/USD</td><td>${c.id==='us'?'1.000':(c.fxRate||0).toFixed(c.fxRate>100?1:3)}</td></tr>
+        <tr><td>Status</td><td style="color:${fxCol}">${c.currencyStrength<40?'🚨 Crisis':c.currencyStrength<60?'⚠ Weak':c.currencyStrength<80?'Soft':'✓ Strong'}</td></tr>
+      </table>
+    </div>
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:12px">
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Labor market</div>
+      <div style="font-family:var(--display);font-size:28px;color:${uCol};margin-bottom:4px">${(c.unemployment||0).toFixed(1)}%</div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:8px">Unemployment rate</div>
+      <div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${Math.min(c.unemployment||0,35)/35*100}%;background:${uCol};border-radius:2px"></div></div>
+      <div style="font-size:11px;color:${uCol}">${c.unemployment<3?'🔥 Near full employment':c.unemployment<5?'✓ Healthy':c.unemployment<8?'Moderate':c.unemployment<15?'Elevated':'⚠ Very high'}</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:6px">Okun: 1% growth ≈ 0.4pp drop<br>Phillips: low unemployment → wage inflation</div>
+    </div>
+  </div>`;
+}
+
+function renderPolicy(c){
+  const pi=myPolicy.interest!==undefined?myPolicy.interest:c.interest;
+  const pt=myPolicy.tax!==undefined?myPolicy.tax:c.tax;
+  const pg=myPolicy.govSpend!==undefined?myPolicy.govSpend:c.govSpend;
+  const pT=myPolicy.tradeOpenness!==undefined?myPolicy.tradeOpenness:0;
+  const pM=myPolicy.monetaryPolicy!==undefined?myPolicy.monetaryPolicy:0;
+  const pI=myPolicy.infraSpend!==undefined?myPolicy.infraSpend:0;
+  const pR=myPolicy.rdSpend!==undefined?myPolicy.rdSpend:0;
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px">
+    <div>
+      ${sl('Interest rate',pi,0,50,0.25,'sl_int','%',v=>myPolicy.interest=+v,'Lower = growth; Higher = fights inflation')}
+      ${sl('Corporate tax',pt,5,55,1,'sl_tax','%',v=>myPolicy.tax=+v,'Lower attracts FDI; Higher funds services')}
+      ${sl('Gov. spending (% GDP)',pg,10,70,1,'sl_gov','%',v=>myPolicy.govSpend=+v,'High = growth boost + debt; Low = fiscal discipline')}
+      ${sl('Trade openness',pT,-10,10,1,'sl_trade','',v=>myPolicy.tradeOpenness=+v,'Positive = open markets; Negative = protectionism')}
+    </div>
+    <div>
+      ${sl('Monetary policy (QE/QT)',pM,-3,3,0.5,'sl_mon','',v=>myPolicy.monetaryPolicy=+v,'QE (positive) = inject money; QT = tighten')}
+      ${sl('Infrastructure spend (% GDP)',pI,0,10,0.5,'sl_infra','%',v=>myPolicy.infraSpend=+v,'Boosts long-term growth (effect in 2 turns)')}
+      ${sl('R&D spend (% GDP)',pR,0,8,0.5,'sl_rd','%',v=>myPolicy.rdSpend=+v,'Boosts tech endowment and reduces unemployment')}
+      <div style="margin-top:14px">
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Debt/GDP</div>
+        <div style="font-size:16px;font-weight:500;font-family:var(--mono);color:${c.debt>100?'var(--red)':c.debt>60?'var(--amber)':'var(--green)'}">${c.debt?.toFixed(0)}%</div>
+        <div class="debt-bar"><div class="debt-fill" style="width:${Math.min(c.debt||0,200)/200*100}%;background:${c.debt>100?'var(--red)':c.debt>60?'var(--amber)':'var(--green)'}"></div></div>
+        <div style="font-size:9px;color:var(--text3);margin-top:4px">${c.debt>150?'⚠ Critical — IMF bailout risk':c.debt>100?'High — monitor carefully':'Manageable'}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function sl(label,val,min,max,step,id,unit,onChange,note){
+  const display=parseFloat(val)>=0?(parseFloat(val)>0&&min<0?'+':'')+parseFloat(val).toFixed(step<1?1:0)+unit:parseFloat(val).toFixed(step<1?1:0)+unit;
+  return `<div class="sl-row">
+    <div class="sl-lbl">${label} <span id="${id}">${display}</span></div>
+    <input type="range" min="${min}" max="${max}" step="${step}" value="${Math.max(min,Math.min(max,val))}" oninput="(${onChange.toString()})(this.value);document.getElementById('${id}').textContent=(parseFloat(this.value)>=0&&${min}<0?'+':'')+parseFloat(this.value).toFixed(${step<1?1:0})+'${unit}'">
+    <div class="sl-note">${note}</div>
+  </div>`;
+}
+
+function renderCommodities(c,vp,isMe){
+  return `<div class="comm-grid" style="grid-template-columns:repeat(5,1fr)">${COMMODITIES.map(cm=>{
+    const price=gameState.commodityPrices[cm.id];
+    const stock=Math.round(c._inv?.[cm.id]||0);
+    return `<div class="comm-card">
+      <div class="comm-icon">${cm.icon}</div>
+      <div class="comm-name">${cm.name}</div>
+      <div class="comm-price">$${Math.round(price).toLocaleString()}</div>
+      <div class="comm-stock">Stock: ${stock}</div>
+    </div>`;
+  }).join('')}</div>
+  ${isMe&&vp?`<div style="background:var(--card2);border:1px solid var(--border);border-radius:7px;padding:10px;display:flex;gap:16px;font-size:11px;flex-wrap:wrap">
+    <span>💰 Budget: <strong style="font-family:var(--mono)">$${vp.budget?.toFixed(0)}B</strong></span>
+    ${COMMODITIES.map(cm=>`<span>${cm.icon} ${cm.name}: <strong style="font-family:var(--mono)">${vp.inventory?.[cm.id]||0}</strong></span>`).join('')}
+  </div>`:''}`;
+}
+
+function renderMarket(isMe){
+  const me=myPlayer();const myOffers=gameState.marketOffers.filter(o=>o.sellerSocketId===socket?.id);const othersOffers=gameState.marketOffers.filter(o=>o.sellerSocketId!==socket?.id);
+  return `<div>
+    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Available offers</div>
+    ${othersOffers.length===0?`<div style="color:var(--text3);font-size:11px;padding:6px 0">No offers on the market yet.</div>`
+    :othersOffers.map(o=>{
+      const cm=COMMODITIES.find(x=>x.id===o.comm);
+      return `<div class="offer-row">
+        <span style="font-size:16px">${o.sellerFlag}</span>
+        <div class="offer-info"><div class="offer-title">${o.sellerName} · ${cm?.icon} ${cm?.name}</div><div class="offer-detail">${o.volume} units · Market: $${Math.round(gameState.commodityPrices[o.comm]).toLocaleString()}/unit</div></div>
+        <div style="font-family:var(--mono);font-size:11px">$${o.price.toLocaleString()}/unit</div>
+        <button class="btn-xs btn-buy" onclick='openNeg(${JSON.stringify(o)})'>Negotiate</button>
+      </div>`;}).join('')}
+    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:14px 0 8px">Post sell offer</div>
+    <div style="background:var(--card2);border:1px solid var(--border2);border-radius:8px;padding:12px">
+      <div class="form-row">
+        <div class="fg"><label>Commodity</label><select id="offerComm" onchange="updateOfferPrice()">${COMMODITIES.map(cm=>`<option value="${cm.id}">${cm.icon} ${cm.name}</option>`).join('')}</select></div>
+        <div class="fg"><label>Volume</label><input type="number" id="offerVol" value="10" min="1" style="width:80px"></div>
+        <div class="fg"><label>Price/unit ($)</label><input type="number" id="offerPrice" style="width:100px"></div>
+        <button class="btn-sm" onclick="postOffer()">Post →</button>
+      </div>
+      <div style="font-size:9px;color:var(--text3)">Market: ${COMMODITIES.map(cm=>`${cm.icon}$${Math.round(gameState.commodityPrices[cm.id]).toLocaleString()}`).join(' ')}</div>
+    </div>
+    ${myOffers.length?`<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px">Your active offers</div>
+    ${myOffers.map(o=>{const cm=COMMODITIES.find(x=>x.id===o.comm);return `<div class="offer-row"><span>${o.sellerFlag}</span><div class="offer-info"><div class="offer-title">${cm?.icon} ${cm?.name} · ${o.volume} units · $${o.price.toLocaleString()}/unit</div></div><button class="btn-xs btn-cancel" onclick="cancelOffer('${o.id}')">Cancel</button></div>`;}).join('')}`:''}
+    ${gameState.completedDeals?.filter(d=>d.buyerSocketId===socket?.id||d.sellerSocketId===socket?.id).length?`<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px">Your deals</div>
+    ${gameState.completedDeals.filter(d=>d.buyerSocketId===socket?.id||d.sellerSocketId===socket?.id).slice(-5).map(d=>{const cm=COMMODITIES.find(x=>x.id===d.comm);const isBuyer=d.buyerSocketId===socket?.id;return `<div class="offer-row"><span>${isBuyer?'📥':'📤'}</span><div class="offer-info"><div class="offer-title">${isBuyer?'Bought':'Sold'} ${cm?.name} · ${d.volume} units</div><div class="offer-detail">${isBuyer?'From':'To'} ${isBuyer?d.sellerName:d.buyerName} · $${d.price.toLocaleString()}/unit</div></div><div style="font-family:var(--mono);font-size:11px;color:${isBuyer?'var(--red)':'var(--green)'}">${isBuyer?'-':'+'}$${d.total?.toFixed(1)}B</div></div>`;}).join('')}`:''}
+  </div>`;
+}
+
+function renderGeo(c,isMe){
+  const mySanctions=(gameState.sanctions||[]).filter(s=>s.active&&(isMe?s.from===myPlayer()?.countryId:s.from===c.id));
+  const againstMe=(gameState.sanctions||[]).filter(s=>s.active&&s.target===c.id);
+  const myAlliances=(gameState.alliances||[]).filter(a=>a.active&&(isMe?a.a===myPlayer()?.countryId||a.b===myPlayer()?.countryId:a.a===c.id||a.b===c.id));
+
+  return `<div style="margin-top:6px">
+    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Active sanctions</div>
+    ${mySanctions.length?mySanctions.map(s=>`<div class="sanction-active"><span>${s.targetFlag} ${s.targetName} — "${s.reason}"</span>${isMe?`<button class="btn-xs btn-cancel" onclick="liftSanction('${s.target}')">Lift</button>`:''}</div>`).join(''):`<div style="color:var(--text3);font-size:11px">No active sanctions imposed by you</div>`}
+    ${againstMe.length?`<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 8px">Sanctions against ${c.name}</div>${againstMe.map(s=>`<div class="sanction-active"><span>${s.fromFlag} ${s.fromName} — "${s.reason}"</span></div>`).join('')}`:''}
+    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px">Alliances</div>
+    ${myAlliances.length?myAlliances.map(a=>`<div class="alliance-active">🤝 ${a.aName} ↔ ${a.bName}</div>`).join(''):`<div style="color:var(--text3);font-size:11px">No active alliances</div>`}
+    ${isMe?`<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:4px">
+      <button class="geo-btn" onclick="openModal('sanctionModal')">⚠ Impose sanctions</button>
+      ${gameState.players.filter(p=>p.socketId!==socket?.id).map(p=>`<button class="geo-btn" onclick="proposeAlliance('${p.socketId}')">🤝 Ally with ${p.name}</button>`).join('')}
+    </div>`:''}
+  </div>`;
+}
+
+function renderLog(){
+  const evs=(gameState.eventLog||[]).slice(-25).reverse();
+  if(!evs.length)return '<div style="color:var(--text3);font-size:11px;padding:8px 0">No events yet.</div>';
+  return `<div style="max-height:220px;overflow-y:auto">${evs.map(e=>`<div style="padding:5px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;font-size:11px"><span style="font-family:var(--mono);font-size:9px;color:var(--text3);white-space:nowrap;padding-top:1px;min-width:50px">${e.quarter}</span><span style="color:var(--text2)">${e.text}</span></div>`).join('')}</div>`;
+}
+
+function buildChart(c,vp){
+  const ctx=document.getElementById('histChart');if(!ctx)return;
+  const hist=vp?vp.history:(c._history||[c.gdpCap]);
+  const labels=hist.map((_,i)=>i===0?'Start':`T${i}`);
+  if(activeChart){activeChart.destroy();activeChart=null;}
+  activeChart=new Chart(ctx,{type:'line',data:{labels,datasets:[{data:hist,borderColor:'#c8a84a',borderWidth:2,pointRadius:2,pointBackgroundColor:'#c8a84a',tension:0.35,fill:{target:'origin',above:'rgba(200,168,74,0.07)'}}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:v=>'$'+Math.round(v.parsed.y).toLocaleString()}}},scales:{x:{ticks:{font:{size:9},color:'#2e3547'},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{font:{size:9},color:'#2e3547',callback:v=>'$'+Math.round(v/1000)+'k'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+// TURN ACTIONS
+function updateOfferPrice(){const comm=document.getElementById('offerComm')?.value;if(comm&&gameState)document.getElementById('offerPrice').value=Math.round(gameState.commodityPrices[comm]);}
+
+function postOffer(){
+  const comm=document.getElementById('offerComm').value;
+  const volume=parseInt(document.getElementById('offerVol').value)||1;
+  const price=parseFloat(document.getElementById('offerPrice').value);
+  socket.emit('postOffer',{comm,volume,price},res=>{if(!res.success)alert(res.error);});
+}
+function cancelOffer(id){socket.emit('cancelOffer',{offerId:id});}
+
+function openNeg(offer){
+  negOffer=offer;const cm=COMMODITIES.find(x=>x.id===offer.comm);
+  document.getElementById('negSub').textContent=`${offer.sellerFlag} ${offer.sellerName} selling ${cm?.icon} ${cm?.name}. Propose your price and volume.`;
+  document.getElementById('negPrice').value=offer.price;document.getElementById('negVol').value=offer.volume;
+  updateNegTotal();
+  document.getElementById('negPrice').oninput=updateNegTotal;document.getElementById('negVol').oninput=updateNegTotal;
+  openModal('negModal');
+}
+function updateNegTotal(){
+  const p=parseFloat(document.getElementById('negPrice')?.value)||0;
+  const v=parseInt(document.getElementById('negVol')?.value)||0;
+  const me=myPlayer();
+  document.getElementById('negTotal').innerHTML=`Total: <strong style="font-family:var(--mono)">$${(p*v).toFixed(1)}B</strong> · Budget: $${me?.budget?.toFixed(0)||0}B`;
+}
+function sendProposal(){
+  if(!negOffer)return;
+  const price=parseFloat(document.getElementById('negPrice').value);
+  const vol=parseInt(document.getElementById('negVol').value);
+  socket.emit('proposeTrade',{offerId:negOffer.id,proposedPrice:price,proposedVolume:vol});
+  closeModal('negModal');
+}
+
+function showTradeModal(p){
+  const cm=COMMODITIES.find(x=>x.id===p.comm);
+  document.getElementById('tradeDetails').innerHTML=`${p.buyerFlag||''} <strong>${p.buyerName}</strong> wants to buy <strong>${cm?.icon} ${cm?.name}</strong><br>Volume: <strong>${p.proposedVolume} units</strong><br>Their price: <strong style="font-family:var(--mono)">$${p.proposedPrice?.toLocaleString()}/unit</strong><br>Market: <strong style="font-family:var(--mono)">$${Math.round(p.marketPrice||0).toLocaleString()}/unit</strong><br>Total: <strong style="font-family:var(--mono)">$${((p.proposedPrice||0)*(p.proposedVolume||0)).toFixed(1)}B</strong>`;
+  openModal('tradeModal');
+}
+function acceptTrade(){if(!incomingTrade)return;socket.emit('respondTrade',{offerId:incomingTrade.offerId,buyerSocketId:incomingTrade.buyerSocketId,proposedPrice:incomingTrade.proposedPrice,proposedVolume:incomingTrade.proposedVolume,accepted:true});closeModal('tradeModal');incomingTrade=null;}
+function rejectTrade(){if(!incomingTrade)return;socket.emit('respondTrade',{offerId:incomingTrade.offerId,buyerSocketId:incomingTrade.buyerSocketId,proposedPrice:incomingTrade.proposedPrice,proposedVolume:incomingTrade.proposedVolume,accepted:false});closeModal('tradeModal');incomingTrade=null;}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+function submitSanction(){
+  const target=document.getElementById('sanctionTarget').value;
+  const reason=document.getElementById('sanctionReason').value.trim();
+  if(!reason){alert('Enter a reason');return;}
+  socket.emit('proposeSanction',{targetId:target,reason});closeModal('sanctionModal');
+}
+function liftSanction(targetId){socket.emit('liftSanction',{targetId});}
+function proposeAlliance(socketId){socket.emit('proposeAlliance',{targetSocketId:socketId});}
+
+function openJustification(){
+  document.getElementById('justText').value='';
+  document.getElementById('justWordCount').textContent='0 words';
+  document.getElementById('justText').oninput=()=>{
+    const words=document.getElementById('justText').value.trim().split(/\s+/).filter(w=>w.length>0).length;
+    document.getElementById('justWordCount').textContent=words+' words'+(words<50?' (need '+50+' min)':'');
+  };
+  // Populate sanction target select
+  const sel=document.getElementById('sanctionTarget');sel.innerHTML='';
+  gameState?.players.filter(p=>p.socketId!==socket?.id).forEach(p=>{
+    const c=getC(p.countryId);
+    const o=document.createElement('option');o.value=p.countryId;o.textContent=(c?.flag||'')+' '+p.name;sel.appendChild(o);
+  });
+  openModal('justModal');
+}
+
+function submitTurn(){
+  const text=document.getElementById('justText').value.trim();
+  const words=text.split(/\s+/).filter(w=>w.length>0).length;
+  if(words<50){alert('Please write at least 50 words for your justification.');return;}
+  socket.emit('submitTurn',{policy:myPolicy,justification:text});
+  document.getElementById('readyBadge').style.display='inline';
+  document.getElementById('endTurnBtn').disabled=true;
+  closeModal('justModal');
+}
+
+function submitLoan(){
+  const amount=parseFloat(document.getElementById('loanAmount').value);
+  const purpose=document.getElementById('loanPurpose').value.trim();
+  const words=purpose.split(/\s+/).filter(w=>w.length>0).length;
+  if(!amount||amount<1){alert('Enter a loan amount');return;}
+  if(words<30){alert('Please write at least 30 words for your loan purpose.');return;}
+  socket.emit('requestLoan',{amount,purpose});closeModal('loanModal');
+  appendChat({name:'System',text:'Loan request submitted to World Bank (Admin)',system:true});
+}
+
+function showEndScreen(){
+  if(!gameState)return;
+  const sorted=[...gameState.players].sort((a,b)=>{
+    const ae=a.ehs?.reduce((s,v)=>s+v,0)/Math.max(a.ehs?.length||1,1);
+    const be=b.ehs?.reduce((s,v)=>s+v,0)/Math.max(b.ehs?.length||1,1);
+    return be-ae;
+  });
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('endPodium').innerHTML=sorted.slice(0,3).map((p,i)=>{
+    const c=getC(p.countryId);const avgEhs=Math.round(p.ehs?.reduce((s,v)=>s+v,0)/Math.max(p.ehs?.length||1,1));
+    return `<div class="end-place ${i===0?'gold':''}"><div style="font-size:24px">${medals[i]||''}${c?.flag}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">${p.name}</div><div style="font-size:13px;font-family:var(--mono);font-weight:500;margin-top:2px;color:${avgEhs>60?'var(--green)':'var(--red)'}">${avgEhs} EHS</div></div>`;
+  }).join('');
+  document.getElementById('endTitle').textContent=sorted[0]?.name+' wins!';
+  document.getElementById('endBody').textContent=`Game complete after ${gameState.maxTurns} turns. Winner: ${sorted[0]?.name} with an average EHS of ${Math.round(sorted[0]?.ehs?.reduce((s,v)=>s+v,0)/Math.max(sorted[0]?.ehs?.length||1,1))}.`;
+  document.getElementById('endScreen').classList.add('show');
+}
+
+function sendChat(){
+  const inp=document.getElementById('chatInput');const text=inp.value.trim();if(!text)return;
+  socket.emit('chat',{text});inp.value='';
+}
+function appendChat(msg){
+  const el=document.getElementById('chatArea');if(!el)return;
+  const div=document.createElement('div');div.className='cmsg'+(msg.system?' sys':'');
+  div.innerHTML=msg.system?msg.text:`<strong>${msg.name}:</strong> ${msg.text}`;
+  el.appendChild(div);el.scrollTop=el.scrollHeight;
+}
+
+let disasterTimer;
+function showDisasterAlert(msg){
+  const el=document.getElementById('disasterAlert');el.textContent=msg;el.classList.add('show');
+  clearTimeout(disasterTimer);disasterTimer=setTimeout(()=>el.classList.remove('show'),6000);
+}
+function showLoanNotif(msg,type){
+  const el=document.getElementById('loanNotif');el.textContent=msg;el.style.borderColor=type==='success'?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)';el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),6000);
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(el=>el.classList.remove('open'));});
+
+init();
+</script>
+</body>
+</html>
