@@ -199,6 +199,10 @@ function calcEHS(c, startCap) {
 
 function simulateCountry(c, policy, room) {
   const q = turnLabel(room);
+
+  // Pre-compute sanctions so AI can react to them this same turn
+  const sanctionCount = (room.sanctions||[]).filter(s=>s.target===c.id&&s.active).length;
+
   // Apply policy
   if (policy) {
     c.interest = policy.interest;
@@ -209,22 +213,39 @@ function simulateCountry(c, policy, room) {
     c.infraSpend = policy.infraSpend || 0;
     c.rdSpend = policy.rdSpend || 0;
   } else {
-    // AI
+    // AI — personality-driven with universal stress overrides
     const personality = c._personality || 'HAWK';
     if (personality === 'HAWK') {
-      if (c.inflation > 4) c.interest = Math.min(25, c.interest + 0.5);
-      else c.interest = Math.max(1, c.interest - 0.25);
+      // Inflation-fighter: ceiling raised to 40 so high-inflation countries never accidentally get cut
+      if (c.inflation > 4) c.interest = Math.min(40, c.interest + 1);
+      else if (c.inflation < 2) c.interest = Math.max(1, c.interest - 0.25);
+      if (c.debt > 100) c.govSpend = Math.max(20, c.govSpend - 1);
     } else if (personality === 'DOVE') {
-      c.interest = Math.max(0.5, c.interest - 0.25);
-      c.govSpend = Math.min(55, c.govSpend + 1);
+      // Growth-first: stimulate hard in downturns, only tighten on severe inflation
+      if (c.growth < 1) { c.interest = Math.max(0.5, c.interest - 0.5); c.govSpend = Math.min(55, c.govSpend + 2); }
+      else if (c.inflation > 6) c.interest = Math.min(15, c.interest + 0.5);
     } else if (personality === 'MERCANTILIST') {
+      // Export-driven: open trade, cut taxes, defend currency weakness
       c.tradeOpenness = Math.min(10, (c.tradeOpenness||0) + 1);
       c.tax = Math.max(15, c.tax - 0.5);
+      if (c.currencyStrength < 70) c.interest = Math.min(25, c.interest + 0.5);
+    } else if (personality === 'ISOLATIONIST') {
+      // Self-sufficient: raise tax and domestic spending, close trade
+      c.tradeOpenness = Math.max(0, (c.tradeOpenness||0) - 1);
+      c.tax = Math.min(40, c.tax + 0.5);
+      c.govSpend = Math.min(50, c.govSpend + 0.5);
+      if (c.inflation > 5) c.interest = Math.min(20, c.interest + 0.5);
     } else {
-      // default adaptive
-      if (c.inflation > 5) c.interest = Math.min(30, c.interest + 0.5);
-      if (c.growth < 1) c.govSpend = Math.min(50, c.govSpend + 1);
+      // OPPORTUNIST: chase FDI and growth, react decisively to inflation shocks
+      if (c.creditScore >= 7) c.interest = Math.max(1, c.interest - 0.25);
+      if (c.inflation > 5) c.interest = Math.min(25, c.interest + 1);
+      if (c.growth < 0) c.govSpend = Math.min(50, c.govSpend + 1);
+      c.tradeOpenness = Math.min(10, (c.tradeOpenness||0) + 0.5);
     }
+    // Universal stress responses — override personality when in crisis
+    if (sanctionCount > 0) c.interest = Math.min(30, c.interest + sanctionCount * 0.5);
+    if (c.debt > 140) { c.govSpend = Math.max(20, c.govSpend - 2); c.tax = Math.min(40, c.tax + 1); }
+    if (c.growth < -3) c.govSpend = Math.min(50, c.govSpend + 2);
     c.tradeOpenness = c.tradeOpenness || 0;
     c.monetaryPolicy = c.monetaryPolicy || 0;
     c.infraSpend = c.infraSpend || 0;
@@ -234,7 +255,8 @@ function simulateCountry(c, policy, room) {
   const bc = c.interest + (CREDIT_SPREAD[Math.round(c.creditScore)] || 5);
   const intEff = c.interest<1?0.8:c.interest<3?0.4:c.interest<6?0.1:c.interest<10?-0.1:c.interest<20?-0.6:-1.2;
   const taxEff = c.tax<10?0.5:c.tax<20?0.3:c.tax<30?0:c.tax<40?-0.2:-0.5;
-  const spEff = c.govSpend>60?-0.3:c.govSpend>50?0.1:c.govSpend>35?0.2:c.govSpend>20?0.15:0;
+  // Very low spending (<10%) penalises growth — no free lunch below a public-goods floor
+  const spEff = c.govSpend>60?-0.3:c.govSpend>50?0.1:c.govSpend>35?0.2:c.govSpend>20?0.15:c.govSpend>10?-0.1:-0.3;
   const debtP = c.debt>200?-1.5:c.debt>150?-0.8:c.debt>120?-0.4:c.debt>90?-0.15:0;
   const creditP = -(bc-5)*0.08;
   const tradeEff = (c.tradeOpenness||0)*0.05;
@@ -245,20 +267,20 @@ function simulateCountry(c, policy, room) {
   const infraEff = (c._infraDelayed||0)*0.05;
   c._infraDelayed = c.infraSpend || 0;
 
-  // Sanctions
-  const sanctionCount = (room.sanctions||[]).filter(s=>s.target===c.id&&s.active).length;
-  const sanctionEff = sanctionCount>2?-0.6:sanctionCount>0?-0.2:0;
-
   // Alliances
   const allyCount = (room.alliances||[]).filter(a=>a.active&&(a.a===c.id||a.b===c.id)).length;
   const allyEff = Math.min(0.3, allyCount*0.05);
+
+  // Sanctions effect on growth
+  const sanctionEff = sanctionCount>2?-0.6:sanctionCount>0?-0.2:0;
 
   // Disasters
   const activeDisasters = (room.disasters||[]).filter(d=>d.countryId===c.id&&d.turnsLeft>0);
   let disasterGdpEff = 0;
   activeDisasters.forEach(d => { disasterGdpEff += d.gdpEffect||0; });
 
-  const noise = (Math.random()-0.47)*0.5;
+  // Unbiased noise — removed the +0.015/turn positive drift
+  const noise = (Math.random()-0.5)*0.5;
   let base = intEff+taxEff+spEff+debtP+creditP+tradeEff+fdiEff+unempEff+currEff+monEff+infraEff+sanctionEff+allyEff+disasterGdpEff+noise;
   c.growth = Math.max(-12, Math.min(16, c.growth*0.5 + base));
   c.gdp *= (1 + c.growth/100);
@@ -271,15 +293,19 @@ function simulateCountry(c, policy, room) {
   const disasterInfl = activeDisasters.reduce((s,d)=>s+(d.inflationEffect||0),0);
   c.inflation = Math.max(0, Math.min(200, c.inflation + demandPull + importInfl + wageInfl - (c.interest-3)*0.15 + disasterInfl + (Math.random()-0.5)*0.4));
 
-  // Unemployment (Okun + Phillips)
-  const okunEff = -(c.growth/4)*0.4;
-  const phillipsEff = c.inflation>5?-0.15:c.inflation<1.5?0.2:0;
+  // Unemployment — corrected Okun: 1pp growth → −0.4pp unemployment (was −0.1pp, 4× too small)
+  // Clamped to ±2pp/turn to prevent extreme single-turn swings
+  const okunEff = Math.max(-2, Math.min(1.5, -c.growth * 0.4));
+  // Phillips: smoother gradient — low unemployment raises inflation, high inflation lowers unemployment
+  const phillipsEff = c.inflation>6?-0.2:c.inflation>4?-0.1:c.inflation<2?0.15:0;
   const disasterUnemp = activeDisasters.reduce((s,d)=>s+(d.unemploymentEffect||0),0);
-  c.unemployment = Math.max(1, Math.min(40, c.unemployment + okunEff + phillipsEff + (4.5-c.unemployment)*0.06 + disasterUnemp + (Math.random()-0.5)*0.25));
+  // Reduced mean-reversion (0.04 from 0.06) to avoid masking the Okun signal
+  c.unemployment = Math.max(1, Math.min(40, c.unemployment + okunEff + phillipsEff + (4.5-c.unemployment)*0.04 + disasterUnemp + (Math.random()-0.5)*0.25));
 
-  // Debt
-  const taxRev = c.tax*c.gdp*0.0015;
-  c.debt = Math.max(0, c.debt + (c.govSpend-20)/4 - c.growth*0.4 + (c.debt>60?(bc-5)*0.02:0));
+  // Debt — tax revenue now genuinely offsets spending (taxRev was computed but never used before)
+  // fiscalBalance: positive = deficit, negative = surplus; interest cost clamped to ≥0 (low-rate countries shouldn't get a free debt reduction)
+  const fiscalBalance = c.govSpend - c.tax * 0.85;
+  c.debt = Math.max(0, c.debt + fiscalBalance/4 - c.growth*0.4 + (c.debt>60?Math.max(0,bc-5)*0.02:0));
 
   // Credit rating
   let cs = c.creditScore;
@@ -326,8 +352,8 @@ function simulateCountry(c, policy, room) {
   const stabAttr=sanctionCount>0?-10:5;
   c.fdi=Math.max(-60,Math.min(600,c.fdi+(taxAttr+ratingAttr+growthAttr+tradeAttr+inflRep+stabAttr)/10+(Math.random()-0.45)*5));
 
-  // Exports/imports
-  c.exports*=(1+(c.tradeOpenness||0)*0.01+Math.random()*0.01);
+  // Exports/imports — halved trade-openness multiplier: was 10%/turn at max, now 5%
+  c.exports*=(1+(c.tradeOpenness||0)*0.005+Math.random()*0.01);
   c.imports*=(1+Math.random()*0.008-0.002);
 
   // Tick down disaster turns
@@ -535,7 +561,11 @@ io.on('connection', socket => {
     buyer.budget-=total;seller.budget+=total;
     buyer.inventory[offer.comm]=(buyer.inventory[offer.comm]||0)+volume;
     const bc2=getC(room,buyer.countryId);const sc2=getC(room,seller.countryId);
-    bc2.gdpCap*=1.001;bc2.gdp*=1.001;sc2.gdpCap*=1.001;sc2.gdp*=1.001;
+    // Supply-chain boost: commodity matters — tech/finance/pharma > energy > food/tourism
+    const SUPPLY_MULT={oil:0.003,gas:0.003,coal:0.002,food:0.001,minerals:0.002,tech:0.006,manufacturing:0.003,pharma:0.004,finance:0.004,tourism:0.001};
+    const buyerBoost=Math.min(0.02,SUPPLY_MULT[offer.comm]||0.002);
+    bc2.gdpCap*=(1+buyerBoost);bc2.gdp*=(1+buyerBoost);
+    sc2.gdpCap*=1.001;sc2.gdp*=1.001;
     const oidx=room.marketOffers.findIndex(o=>o.id===offerId);
     if(oidx!==-1){if(volume>=room.marketOffers[oidx].volume)room.marketOffers.splice(oidx,1);else{room.marketOffers[oidx].volume-=volume;sc2._inv[offer.comm]+=(offer.volume-volume);}}
     const cm=COMMODITIES.find(x=>x.id===offer.comm);
