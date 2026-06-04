@@ -280,9 +280,12 @@ function simulateCountry(c, policy, room) {
   activeDisasters.forEach(d => { disasterGdpEff += d.gdpEffect||0; });
 
   // Unbiased noise — removed the +0.015/turn positive drift
+  // R&D: boosts long-run productivity growth (innovation effect)
+  const rdEff = (c.rdSpend||0)*0.03;
   const noise = (Math.random()-0.5)*0.5;
-  let base = intEff+taxEff+spEff+debtP+creditP+tradeEff+fdiEff+unempEff+currEff+monEff+infraEff+sanctionEff+allyEff+disasterGdpEff+noise;
-  c.growth = Math.max(-12, Math.min(16, c.growth*0.5 + base));
+  let base = intEff+taxEff+spEff+debtP+creditP+tradeEff+fdiEff+unempEff+currEff+monEff+infraEff+rdEff+sanctionEff+allyEff+disasterGdpEff+noise;
+  // Real-world max sustained growth ~10% (China boom); peacetime depression floor ~-10%
+  c.growth = Math.max(-10, Math.min(12, c.growth*0.5 + base));
   c.gdp *= (1 + c.growth/100);
   c.gdpCap *= (1 + c.growth/100);
 
@@ -296,11 +299,14 @@ function simulateCountry(c, policy, room) {
   // Unemployment — corrected Okun: 1pp growth → −0.4pp unemployment (was −0.1pp, 4× too small)
   // Clamped to ±2pp/turn to prevent extreme single-turn swings
   const okunEff = Math.max(-2, Math.min(1.5, -c.growth * 0.4));
-  // Phillips: smoother gradient — low unemployment raises inflation, high inflation lowers unemployment
   const phillipsEff = c.inflation>6?-0.2:c.inflation>4?-0.1:c.inflation<2?0.15:0;
+  // R&D creates high-skill jobs, reduces structural unemployment
+  const rdUnempEff = -(c.rdSpend||0)*0.04;
   const disasterUnemp = activeDisasters.reduce((s,d)=>s+(d.unemploymentEffect||0),0);
-  // Reduced mean-reversion (0.04 from 0.06) to avoid masking the Okun signal
-  c.unemployment = Math.max(1, Math.min(40, c.unemployment + okunEff + phillipsEff + (4.5-c.unemployment)*0.04 + disasterUnemp + (Math.random()-0.5)*0.25));
+  // Mean-revert toward THIS country's own structural rate, not a universal 4.5%
+  // (South Africa's natural rate is ~32%, not 4.5%)
+  const naturalUnemp = c._naturalUnemp || 4.5;
+  c.unemployment = Math.max(1, Math.min(40, c.unemployment + okunEff + phillipsEff + rdUnempEff + (naturalUnemp-c.unemployment)*0.03 + disasterUnemp + (Math.random()-0.5)*0.25));
 
   // Debt — tax revenue now genuinely offsets spending (taxRev was computed but never used before)
   // fiscalBalance: positive = deficit, negative = surplus; interest cost clamped to ≥0 (low-rate countries shouldn't get a free debt reduction)
@@ -316,7 +322,9 @@ function simulateCountry(c, policy, room) {
   if(c.unemployment>20)cs-=0.4;
   if(sanctionCount>0)cs-=0.3*sanctionCount;
   const oldCS = Math.round(c.creditScore);
-  c.creditScore = Math.max(1, Math.min(10, cs));
+  // Rating agencies move slowly: cap at -1 notch down or +0.3 up per turn
+  const csChange = cs - c.creditScore;
+  c.creditScore = Math.max(1, Math.min(10, c.creditScore + Math.max(-1.0, Math.min(0.3, csChange))));
   const newCS = Math.round(c.creditScore);
   c.creditLabel = CREDIT_LABELS[newCS]||'B';
   if(newCS<oldCS) room.eventLog.push({quarter:q,text:`📉 ${c.flag} ${c.name} downgraded to ${c.creditLabel}`,country:c.id});
@@ -330,9 +338,13 @@ function simulateCountry(c, policy, room) {
 
   // Currency
   const worldAvgRate=5, worldAvgInfl=4;
-  const rateEff=(c.interest-worldAvgRate)*1.2;
+  // Real interest rate differential drives capital flows (UIP) — not nominal
+  // Turkey: nominal 42.5% but real = 42.5-44 = -1.5% → capital LEAVES despite high nominal rates
+  const worldRealRate = worldAvgRate - worldAvgInfl;
+  const rateEff = ((c.interest - c.inflation) - worldRealRate) * 0.5;
   const tradeBalEff=(c.exports-c.imports)/Math.max(c.gdp,1)*25;
-  const inflEff=-(c.inflation-worldAvgInfl)*0.6;
+  // PPP effect: high inflation erodes currency value independently of rates (reduced from 0.6 since real rate already captures part of this)
+  const inflEff=-(c.inflation-worldAvgInfl)*0.25;
   const ratingEff=(c.creditScore-7)*0.4;
   const fdiCurrEff=c.fdi>0?Math.log(c.fdi+1)*0.25:c.fdi*0.06;
   const monCurrEff=-(c.monetaryPolicy||0)*0.3;
@@ -352,9 +364,17 @@ function simulateCountry(c, policy, room) {
   const stabAttr=sanctionCount>0?-10:5;
   c.fdi=Math.max(-60,Math.min(600,c.fdi+(taxAttr+ratingAttr+growthAttr+tradeAttr+inflRep+stabAttr)/10+(Math.random()-0.45)*5));
 
-  // Exports/imports — halved trade-openness multiplier: was 10%/turn at max, now 5%
-  c.exports*=(1+(c.tradeOpenness||0)*0.005+Math.random()*0.01);
-  c.imports*=(1+Math.random()*0.008-0.002);
+  // Exports: only POSITIVE trade openness boosts them (your own tariffs don't hurt your exports;
+  // only partner retaliation does, which is captured by the tradeEff growth penalty).
+  // Weak currency makes exports cheaper abroad → competitiveness boost (Marshall-Lerner).
+  const fxExportBoost = Math.max(-0.02, Math.min(0.02, (100-c.currencyStrength)*0.0005));
+  c.exports *= (1 + Math.max(0,c.tradeOpenness||0)*0.005 + fxExportBoost + Math.random()*0.01);
+
+  // Imports: strong currency makes imports cheaper (more imports); growth raises incomes → more imports.
+  // Protectionism (negative tradeOpenness) directly reduces imports.
+  const fxImportEff = Math.max(-0.03, Math.min(0.03, (c.currencyStrength-100)*0.0004));
+  const protectImportEff = Math.max(0, -(c.tradeOpenness||0)) * 0.003;
+  c.imports *= (1 + fxImportEff + Math.max(0,c.growth)*0.002 - protectImportEff + Math.random()*0.008 - 0.002);
 
   // Tick down disaster turns
   room.disasters.forEach(d=>{if(d.countryId===c.id&&d.turnsLeft>0)d.turnsLeft--;});
@@ -426,7 +446,7 @@ io.on('connection', socket => {
     const isAdmin = socket.user.username === ADMIN_USERNAME;
     rooms[code] = {
       code, hostSocketId:socket.id, phase:'lobby', turn:1, maxTurns:5,
-      players:[], countries:G20.map(c=>{ const cl=deepClone(c); cl._personality=AI_PERSONALITIES[Math.floor(Math.random()*AI_PERSONALITIES.length)]; cl._history=[c.gdpCap]; cl._infraDelayed=0; return cl; }),
+      players:[], countries:G20.map(c=>{ const cl=deepClone(c); cl._personality=AI_PERSONALITIES[Math.floor(Math.random()*AI_PERSONALITIES.length)]; cl._history=[c.gdpCap]; cl._infraDelayed=0; cl._naturalUnemp=c.unemployment; return cl; }),
       commodityPrices:Object.fromEntries(COMMODITIES.map(c=>[c.id,c.basePrice])),
       marketOffers:[], completedDeals:[], eventLog:[], chat:[], offerCounter:0,
       pendingActions:{}, sanctions:[], alliances:[], tradeWars:[], loanRequests:[],
