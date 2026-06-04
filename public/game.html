@@ -326,8 +326,8 @@ function connectSocket(){
   const token=document.cookie.split('mef_token=')[1]?.split(';')[0];
   socket=io({auth:{token}});
   socket.on('connect',()=>{
-    if(roomCode)socket.emit('joinRoom',{code:roomCode,name:myUser.username},res=>{
-      if(!res.success){alert('Could not join room: '+res.error);window.location.href='/';}
+    if(roomCode)socket.emit('rejoinRoom',{code:roomCode},res=>{
+      if(!res.success){alert('Could not rejoin room: '+res.error);window.location.href='/';}
     });
   });
   socket.on('stateUpdate',state=>{gameState=state;renderAll();});

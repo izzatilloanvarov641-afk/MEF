@@ -429,6 +429,26 @@ io.on('connection', socket => {
     io.to(code).emit('chat', { name:'System', text:`${socket.user.username} joined!`, system:true });
   });
 
+  socket.on('rejoinRoom', ({ code }, cb) => {
+    if (!socket.user) return cb({ success: false, error: 'Not logged in' });
+    const room = rooms[code];
+    if (!room) return cb({ success: false, error: 'Room not found' });
+    const isAdmin = socket.user.username === ADMIN_USERNAME;
+    if (isAdmin) {
+      room.adminSocket = socket.id;
+      socket.join(code);
+      socket.data.roomCode = code;
+      return cb({ success: true, isAdmin: true });
+    }
+    const player = room.players.find(p => p.name === socket.user.username);
+    if (!player) return cb({ success: false, error: 'You are not in this room' });
+    player.socketId = socket.id;
+    socket.join(code);
+    socket.data.roomCode = code;
+    cb({ success: true, isAdmin: false });
+    sendState(code);
+  });
+
   socket.on('selectCountry', ({ countryId }) => {
     const room = rooms[socket.data.roomCode]; if (!room) return;
     const p = room.players.find(p=>p.socketId===socket.id); if (!p) return;
