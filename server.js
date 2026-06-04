@@ -702,6 +702,18 @@ async function endGame(code) {
   }
 }
 
+// ── ADMIN API ────────────────────────────────────────────────
+app.get('/api/admin/rooms', requireAdmin, (req, res) => {
+  const activeRooms = Object.values(rooms).map(r => ({
+    code: r.code,
+    phase: r.phase,
+    playerCount: r.players.length,
+    turn: r.turn,
+    maxTurns: r.maxTurns
+  }));
+  res.json({ rooms: activeRooms });
+});
+
 // ── SERVE PAGES ──────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

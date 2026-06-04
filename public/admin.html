@@ -92,6 +92,36 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);backgro
 </style>
 </head>
 <body>
+
+<!-- ROOM SELECTOR OVERLAY -->
+<div id="roomSelector" style="position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="width:480px;max-width:100%">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-family:var(--display);font-size:48px;color:var(--gold);letter-spacing:.08em;line-height:1">MEF</div>
+      <div style="font-family:var(--display);font-size:18px;color:var(--text2);letter-spacing:.2em;margin-bottom:8px">ADMIN PANEL</div>
+      <div style="font-size:12px;color:var(--text3)">Enter a room code or select an active room to connect</div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-title">Connect to room</div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="rsCodeInput" placeholder="e.g. A3F9B2" maxlength="6"
+          style="flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:6px;color:var(--text);font-size:20px;padding:10px 14px;font-family:var(--mono);letter-spacing:.15em;text-transform:uppercase"
+          oninput="this.value=this.value.toUpperCase()"
+          onkeydown="if(event.key==='Enter')connectToRoom()">
+        <button class="btn" style="font-size:13px;white-space:nowrap;padding:10px 20px" onclick="connectToRoom()">Connect →</button>
+      </div>
+      <div id="rsErr" style="font-size:11px;color:var(--red);margin-top:6px;display:none"></div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em">Active rooms</div>
+        <button class="btn-ghost" style="padding:4px 10px;font-size:11px" onclick="loadRooms()">↻ Refresh</button>
+      </div>
+      <div id="rsList"><div style="font-size:12px;color:var(--text3);text-align:center;padding:16px 0">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
 <div class="app">
   <div class="topbar">
     <span class="tb-brand">MEF</span>
@@ -204,18 +234,60 @@ function connectSocket(){
   const token=document.cookie.split('mef_token=')[1]?.split(';')[0];
   socket=io({auth:{token}});
   socket.on('connect',()=>{
+    loadRooms();
     if(roomParam){
-      roomCode=roomParam;
-      socket.emit('joinRoom',{code:roomCode,name:myUser.username},res=>{
-        if(res.success){document.getElementById('roomBadge').textContent='Room: '+roomCode;}
-        else alert('Could not join room: '+res.error);
-      });
+      document.getElementById('rsCodeInput').value=roomParam;
+      connectToRoom();
     }
   });
   socket.on('stateUpdate',state=>{renderAllTabs(state);});
   socket.on('adminUpdate',state=>{adminState=state;renderAllTabs(state);});
   socket.on('gameStarted',()=>{});
   socket.on('chat',()=>{});
+}
+
+async function loadRooms(){
+  try{
+    const res=await fetch('/api/admin/rooms',{credentials:'include'});
+    const data=await res.json();
+    const el=document.getElementById('rsList');
+    if(!data.rooms||!data.rooms.length){
+      el.innerHTML='<div style="font-size:12px;color:var(--text3);text-align:center;padding:16px 0">No active rooms</div>';
+      return;
+    }
+    el.innerHTML=data.rooms.map(r=>`<div onclick="pickRoom('${r.code}')" style="display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;border-radius:6px;transition:background .15s;border-bottom:1px solid var(--border)" onmouseover="this.style.background='rgba(255,255,255,.04)'" onmouseout="this.style.background=''">
+      <span style="font-family:var(--mono);font-size:15px;color:var(--gold);letter-spacing:.12em;min-width:80px">${r.code}</span>
+      <div style="flex:1;font-size:12px;color:var(--text2)">${r.playerCount} player${r.playerCount!==1?'s':''} · ${r.phase==='lobby'?'Lobby':'Turn '+r.turn+'/'+r.maxTurns}</div>
+      <span style="font-size:9px;padding:2px 8px;border-radius:4px;font-family:var(--mono);${r.phase==='lobby'?'background:rgba(16,185,129,.1);color:var(--green)':r.phase==='playing'?'background:rgba(245,158,11,.1);color:var(--amber)':'background:rgba(200,168,74,.1);color:var(--gold)'}">${r.phase.toUpperCase()}</span>
+    </div>`).join('');
+  }catch(e){
+    document.getElementById('rsList').innerHTML='<div style="font-size:12px;color:var(--red);text-align:center;padding:16px 0">Failed to load rooms</div>';
+  }
+}
+
+function pickRoom(code){
+  document.getElementById('rsCodeInput').value=code;
+  connectToRoom();
+}
+
+function connectToRoom(){
+  const code=document.getElementById('rsCodeInput').value.trim().toUpperCase();
+  if(!code){showRsErr('Enter a room code');return;}
+  document.getElementById('rsErr').style.display='none';
+  socket.emit('rejoinRoom',{code},res=>{
+    if(res.success){
+      roomCode=code;
+      document.getElementById('roomBadge').textContent='Room: '+code;
+      document.getElementById('roomSelector').style.display='none';
+    }else{
+      showRsErr(res.error||'Room not found');
+    }
+  });
+}
+
+function showRsErr(msg){
+  const el=document.getElementById('rsErr');
+  el.textContent=msg;el.style.display='block';
 }
 
 function renderAllTabs(state){
