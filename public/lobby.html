@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEF — Lobby</title>
+<script src="/socket.io/socket.io.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#06080f;--navy:#0a0f1c;--card:#0d1220;--border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);--text:#e4e9f5;--text2:#6b7589;--text3:#2e3547;--gold:#c8a84a;--gold2:#e2c46a;--blue:#2563eb;--green:#10b981;--red:#ef4444;--amber:#f59e0b;--font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--display:'Bebas Neue',sans-serif}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+nav{background:rgba(6,8,15,.9);border-bottom:1px solid var(--border);padding:0 32px;height:56px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+.nav-brand{font-family:var(--display);font-size:20px;color:var(--gold);text-decoration:none;letter-spacing:.1em}
+.spacer{flex:1}
+.nav-user{font-size:13px;color:var(--text2)}
+.nav-user strong{color:var(--text)}
+.btn{background:var(--gold);color:var(--bg);border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-family:var(--font);font-weight:500;cursor:pointer;transition:all .2s}
+.btn:hover{background:var(--gold2);transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:9px 20px;font-size:13px;font-family:var(--font);cursor:pointer;transition:all .2s}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:6px 14px;font-size:12px;font-family:var(--font);cursor:pointer}
+
+main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
+.page-title{font-family:var(--display);font-size:48px;color:var(--gold);letter-spacing:.05em;margin-bottom:6px}
+.page-sub{font-size:14px;color:var(--text2);margin-bottom:32px}
+
+.lobby-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:700px){.lobby-grid{grid-template-columns:1fr}}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 24px}
+.card-title{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.06em}
+.field input{width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border2);border-radius:7px;color:var(--text);font-size:14px;padding:10px 13px;font-family:var(--font)}
+.field input:focus{outline:none;border-color:rgba(200,168,74,.4)}
+.room-code{font-family:var(--mono);font-size:32px;font-weight:500;color:var(--gold);letter-spacing:.18em;text-align:center;padding:16px;background:rgba(200,168,74,.06);border-radius:8px;border:1px solid rgba(200,168,74,.15);margin-bottom:10px}
+.code-note{font-size:11px;color:var(--text3);text-align:center;margin-bottom:16px}
+
+/* lobby room view */
+.lobby-room{display:none}
+.lobby-room.active{display:block}
+.player-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.player-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px}
+.player-flag{font-size:20px}
+.player-name{font-size:13px;font-weight:500;flex:1}
+.player-country{font-size:12px;color:var(--text2)}
+.player-status{font-size:10px;font-family:var(--mono)}
+.player-status.ready{color:var(--green)}
+.player-status.picking{color:var(--amber)}
+
+/* country grid */
+.country-picker{display:none}
+.country-picker.active{display:block}
+.cp-title{font-size:14px;font-weight:500;margin-bottom:12px}
+.country-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-height:300px;overflow-y:auto}
+.country-grid::-webkit-scrollbar{width:3px}
+.country-grid::-webkit-scrollbar-thumb{background:var(--border2)}
+.ctile{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:9px 5px;cursor:pointer;text-align:center;transition:all .15s}
+.ctile:hover{border-color:var(--gold);background:rgba(200,168,74,.08)}
+.ctile.selected{border-color:var(--gold);background:rgba(200,168,74,.15)}
+.ctile.taken{opacity:.3;pointer-events:none}
+.ctile .cf{font-size:20px}
+.ctile .cn2{font-size:9px;color:var(--text2);margin-top:3px;line-height:1.2}
+
+/* chat */
+.chat-messages{height:180px;overflow-y:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:4px}
+.chat-messages::-webkit-scrollbar{width:3px}
+.chat-messages::-webkit-scrollbar-thumb{background:var(--border2)}
+.chat-msg{font-size:12px;color:var(--text2);line-height:1.5}
+.chat-msg strong{color:var(--text)}
+.chat-msg.system{color:var(--text3);font-style:italic}
+.chat-row{display:flex;gap:8px}
+.chat-row input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:7px 10px;font-family:var(--font)}
+.chat-row input:focus{outline:none;border-color:rgba(200,168,74,.3)}
+.chat-send{background:var(--gold);color:var(--bg);border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:var(--font)}
+
+.err{font-size:12px;color:var(--red);margin-top:6px;display:none}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px 16px;font-size:12px;display:none;z-index:999}
+.toast.show{display:block}
+.toast.success{border-color:rgba(16,185,129,.4);color:var(--green)}
+.toast.error{border-color:rgba(239,68,68,.4);color:var(--red)}
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-brand">MEF</a>
+  <div class="spacer"></div>
+  <span class="nav-user">Playing as <strong id="navName">—</strong></span>
+</nav>
+
+<main>
+  <div class="page-title">Game Lobby</div>
+  <div class="page-sub">Create a room or join with a code. Pick your nation and wait for the host to start.</div>
+
+  <!-- JOIN/CREATE SCREEN -->
+  <div id="joinScreen">
+    <div class="lobby-grid">
+      <div class="card">
+        <div class="card-title">Create new room</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">Start a private game. Share the room code with friends. You can play solo against AI.</p>
+        <button class="btn" style="width:100%" onclick="createRoom()">Create room →</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Join existing room</div>
+        <div class="field">
+          <label>Room code</label>
+          <input type="text" id="joinCodeInput" placeholder="e.g. A3F9B2" maxlength="6" style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.1em" onkeydown="if(event.key==='Enter')joinRoom()">
+        </div>
+        <div class="err" id="joinErr"></div>
+        <button class="btn-ghost" style="width:100%" onclick="joinRoom()">Join room →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROOM SCREEN -->
+  <div id="roomScreen" style="display:none">
+    <div class="lobby-grid">
+      <div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title">Room code</div>
+          <div class="room-code" id="roomCodeDisplay">——</div>
+          <div class="code-note">Share this code with friends</div>
+          <button class="btn-ghost" style="width:100%;font-size:12px" onclick="copyCode()">Copy code</button>
+        </div>
+
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-title">Players in room</div>
+          <div class="player-list" id="playerList"></div>
+          <div id="startBtnWrap" style="display:none">
+            <button class="btn" style="width:100%" id="startBtn" onclick="startGame()">Start game →</button>
+            <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px">Empty slots will be filled by AI countries</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Chat</div>
+          <div class="chat-messages" id="chatMessages"></div>
+          <div class="chat-row">
+            <input type="text" id="chatInput" placeholder="Say something…" maxlength="200" onkeydown="if(event.key==='Enter')sendChat()">
+            <button class="chat-send" onclick="sendChat()">→</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="cp-title">Pick your nation</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Select a country to play as. Taken countries are greyed out.</div>
+          <div class="country-grid" id="countryGrid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const G20 = [
+  {id:'us',name:'United States',flag:'🇺🇸'},{id:'cn',name:'China',flag:'🇨🇳'},
+  {id:'de',name:'Germany',flag:'🇩🇪'},{id:'jp',name:'Japan',flag:'🇯🇵'},
+  {id:'in',name:'India',flag:'🇮🇳'},{id:'uk',name:'United Kingdom',flag:'🇬🇧'},
+  {id:'fr',name:'France',flag:'🇫🇷'},{id:'br',name:'Brazil',flag:'🇧🇷'},
+  {id:'it',name:'Italy',flag:'🇮🇹'},{id:'ca',name:'Canada',flag:'🇨🇦'},
+  {id:'ru',name:'Russia',flag:'🇷🇺'},{id:'kr',name:'South Korea',flag:'🇰🇷'},
+  {id:'au',name:'Australia',flag:'🇦🇺'},{id:'mx',name:'Mexico',flag:'🇲🇽'},
+  {id:'id',name:'Indonesia',flag:'🇮🇩'},{id:'tr',name:'Turkey',flag:'🇹🇷'},
+  {id:'sa',name:'Saudi Arabia',flag:'🇸🇦'},{id:'ar',name:'Argentina',flag:'🇦🇷'},
+  {id:'za',name:'South Africa',flag:'🇿🇦'},{id:'eu',name:'European Union',flag:'🇪🇺'}
+];
+
+let socket, myUser, myRoomCode, isHost=false, gameState=null;
+
+async function init() {
+  const res = await fetch('/api/auth/me', { credentials:'include' });
+  if (!res.ok) { window.location.href = '/'; return; }
+  const data = await res.json();
+  myUser = data.user;
+  document.getElementById('navName').textContent = myUser.username;
+  if (myUser.isAdmin) { window.location.href = '/admin.html'; return; }
+  connectSocket();
+  buildCountryGrid();
+}
+
+function connectSocket() {
+  const token = document.cookie.split('mef_token=')[1]?.split(';')[0];
+  socket = io({ auth: { token } });
+
+  socket.on('stateUpdate', state => {
+    gameState = state;
+    renderLobby(state);
+  });
+
+  socket.on('gameStarted', () => {
+    window.location.href = '/game.html?room=' + myRoomCode;
+  });
+
+  socket.on('chat', msg => appendChat(msg));
+}
+
+function buildCountryGrid() {
+  const grid = document.getElementById('countryGrid');
+  grid.innerHTML = G20.map(c => `
+    <div class="ctile" data-id="${c.id}" onclick="selectCountry('${c.id}')">
+      <div class="cf">${c.flag}</div>
+      <div class="cn2">${c.name.split(' ')[0]}</div>
+    </div>`).join('');
+}
+
+function renderLobby(state) {
+  const taken = state.players.map(p=>p.countryId).filter(Boolean);
+  const me = state.players.find(p=>p.socketId===socket.id);
+
+  // Update country grid
+  document.querySelectorAll('.ctile').forEach(el => {
+    const id = el.dataset.id;
+    el.classList.toggle('taken', taken.includes(id) && me?.countryId !== id);
+    el.classList.toggle('selected', me?.countryId === id);
+  });
+
+  // Player list
+  const list = document.getElementById('playerList');
+  list.innerHTML = state.players.map(p => {
+    const c = G20.find(x=>x.id===p.countryId);
+    const isMe = p.socketId === socket.id;
+    return `<div class="player-row">
+      <span class="player-flag">${c?c.flag:'🌐'}</span>
+      <span class="player-name">${p.name}${isMe?' (you)':''}</span>
+      <span class="player-country">${c?c.name:'Picking...'}</span>
+    </div>`;
+  }).join('');
+
+  // Start button
+  const startWrap = document.getElementById('startBtnWrap');
+  if (isHost) {
+    startWrap.style.display = 'block';
+    document.getElementById('startBtn').disabled = state.players.some(p=>!p.countryId);
+  }
+}
+
+async function createRoom() {
+  socket.emit('createRoom', { name: myUser.username }, res => {
+    if (!res.success) { showToast(res.error, 'error'); return; }
+    myRoomCode = res.code;
+    isHost = true;
+    showRoomScreen(res.code);
+  });
+}
+
+function joinRoom() {
+  const code = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+  if (!code) { showErr('joinErr', 'Enter a room code'); return; }
+  socket.emit('joinRoom', { code, name: myUser.username }, res => {
+    if (!res.success) { showErr('joinErr', res.error); return; }
+    myRoomCode = res.code;
+    isHost = false;
+    showRoomScreen(res.code);
+  });
+}
+
+function showRoomScreen(code) {
+  document.getElementById('joinScreen').style.display = 'none';
+  document.getElementById('roomScreen').style.display = 'block';
+  document.getElementById('roomCodeDisplay').textContent = code;
+}
+
+function selectCountry(id) {
+  socket.emit('selectCountry', { countryId: id });
+}
+
+function startGame() {
+  socket.emit('startGame', {}, res => {
+    if (!res.success) showToast(res.error || 'Cannot start yet', 'error');
+  });
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(myRoomCode).then(()=>showToast('Code copied!','success'));
+}
+
+function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  socket.emit('chat', { text });
+  inp.value = '';
+}
+
+function appendChat(msg) {
+  const el = document.getElementById('chatMessages');
+  const div = document.createElement('div');
+  div.className = 'chat-msg' + (msg.system?' system':'');
+  div.innerHTML = msg.system ? msg.text : `<strong>${msg.name}:</strong> ${msg.text}`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 3000);
+}
+
+let toastTimer;
+function showToast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'toast show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+init();
+</script>
+</body>
+</html>
