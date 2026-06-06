@@ -279,7 +279,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   <div class="modal">
     <h3>Impose sanctions</h3>
     <p>State your reason. This will be announced to all players.</p>
-    <div class="modal-field"><label>Target country</label><select id="sanctionTarget"></select></div>
+    <div class="modal-field"><label>Target country</label><select id="sanctionTarget" onchange="updateSanctionPreview()"></select></div>
+    <div id="sanctionPreview" style="display:none;font-size:11px;padding:6px 10px;border-radius:6px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);color:var(--red);margin-bottom:4px"></div>
     <div class="modal-field"><label>Reason</label><input type="text" id="sanctionReason" placeholder="e.g. Violation of trade agreement" maxlength="150"></div>
     <div class="modal-btns">
       <button class="modal-cancel" onclick="closeModal('sanctionModal')">Cancel</button>
@@ -627,19 +628,22 @@ function renderMarket(isMe){
 }
 
 function renderGeo(c,isMe){
-  const mySanctions=(gameState.sanctions||[]).filter(s=>s.active&&(isMe?s.from===myPlayer()?.countryId:s.from===c.id));
+  const viewedId=isMe?myPlayer()?.countryId:c.id;
+  const mySanctions=(gameState.sanctions||[]).filter(s=>s.active&&s.from===viewedId);
   const againstMe=(gameState.sanctions||[]).filter(s=>s.active&&s.target===c.id);
-  const myAlliances=(gameState.alliances||[]).filter(a=>a.active&&(isMe?a.a===myPlayer()?.countryId||a.b===myPlayer()?.countryId:a.a===c.id||a.b===c.id));
+  const myAlliances=(gameState.alliances||[]).filter(a=>a.active&&(a.a===c.id||a.b===c.id));
+  const myInf=getInfluence(c.id);
 
   return `<div style="margin-top:6px">
-    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Active sanctions</div>
-    ${mySanctions.length?mySanctions.map(s=>`<div class="sanction-active"><span>${s.targetFlag} ${s.targetName} — "${s.reason}"</span>${isMe?`<button class="btn-xs btn-cancel" onclick="liftSanction('${s.target}')">Lift</button>`:''}</div>`).join(''):`<div style="color:var(--text3);font-size:11px">No active sanctions imposed by you</div>`}
-    ${againstMe.length?`<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 8px">Sanctions against ${c.name}</div>${againstMe.map(s=>`<div class="sanction-active"><span>${s.fromFlag} ${s.fromName} — "${s.reason}"</span></div>`).join('')}`:''}
+    <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Active sanctions</div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px">Your influence: <strong style="color:var(--gold)">${myInf.toFixed(1)}</strong></div>
+    ${mySanctions.length?mySanctions.map(s=>{const ti=getInfluence(s.target);const pct=Math.min(40,Math.round(15*(myInf/ti)));return `<div class="sanction-active"><span>${s.targetFlag} ${s.targetName} <span style="font-size:10px;color:var(--text3)">(inf:${ti.toFixed(1)} · ≈${pct}% export hit)</span> — "${s.reason}"</span>${isMe?`<button class="btn-xs btn-cancel" onclick="liftSanction('${s.target}')">Lift</button>`:''}</div>`;}).join(''):`<div style="color:var(--text3);font-size:11px">No active sanctions imposed</div>`}
+    ${againstMe.length?`<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 8px">Sanctions against ${c.name}</div>${againstMe.map(s=>{const si=getInfluence(s.from);const pct=Math.min(40,Math.round(15*(si/myInf)));return `<div class="sanction-active"><span>${s.fromFlag} ${s.fromName} <span style="font-size:10px;color:var(--text3)">(inf:${si.toFixed(1)} · ≈${pct}% export hit)</span> — "${s.reason}"</span></div>`;}).join('')}`:''}
     <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px">Alliances</div>
-    ${myAlliances.length?myAlliances.map(a=>`<div class="alliance-active">🤝 ${a.aName} ↔ ${a.bName}</div>`).join(''):`<div style="color:var(--text3);font-size:11px">No active alliances</div>`}
+    ${myAlliances.length?myAlliances.map(a=>{const partnerId=a.a===c.id?a.b:a.a;const pi=getInfluence(partnerId);const bonus=pi>myInf?`+${(0.1*(pi/myInf)).toFixed(2)}%/turn`:'flat +0.05%/turn';return `<div class="alliance-active">🤝 ${a.aName} ↔ ${a.bName} <span style="font-size:10px;color:var(--green)">(growth ${bonus})</span></div>`;}).join(''):`<div style="color:var(--text3);font-size:11px">No active alliances</div>`}
     ${isMe?`<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:4px">
-      <button class="geo-btn" onclick="openModal('sanctionModal')">⚠ Impose sanctions</button>
-      ${gameState.players.filter(p=>p.socketId!==socket?.id).map(p=>`<button class="geo-btn" onclick="proposeAlliance('${p.socketId}')">🤝 Ally with ${p.name}</button>`).join('')}
+      <button class="geo-btn" onclick="openSanctionModal()">⚠ Impose sanctions</button>
+      ${gameState.players.filter(p=>p.socketId!==socket?.id).map(p=>{const pi=getInfluence(p.countryId).toFixed(1);return `<button class="geo-btn" onclick="proposeAllianceWithConfirm('${p.socketId}','${p.countryId}')">🤝 Ally with ${p.name} <span style="font-size:10px;opacity:.7">(inf:${pi})</span></button>`;}).join('')}
     </div>`:''}
   </div>`;
 }
@@ -710,6 +714,35 @@ function submitSanction(){
 }
 function liftSanction(targetId){socket.emit('liftSanction',{targetId});}
 function proposeAlliance(socketId){socket.emit('proposeAlliance',{targetSocketId:socketId});}
+
+function getInfluence(countryId){
+  if(!countryId||countryId==='ADMIN')return 3;
+  const co=gameState?.countries?.find(c=>c.id===countryId);
+  return co?Math.sqrt(Math.max(0.1,co.gdp)/1000):1;
+}
+function updateSanctionPreview(){
+  const targetId=document.getElementById('sanctionTarget').value;
+  const el=document.getElementById('sanctionPreview');
+  if(!targetId||!gameState){el.style.display='none';return;}
+  const me=myPlayer();if(!me){el.style.display='none';return;}
+  const myInf=getInfluence(me.countryId);
+  const ti=getInfluence(targetId);
+  const tC=gameState.countries.find(c=>c.id===targetId);
+  const pct=Math.min(40,Math.round(15*(myInf/ti)));
+  el.textContent=`Sanctioning ${tC?.flag||''}${tC?.name||targetId} will cost them ≈${pct}% of exports per turn. (Your influence: ${myInf.toFixed(1)}, theirs: ${ti.toFixed(1)})`;
+  el.style.display='block';
+}
+function openSanctionModal(){openModal('sanctionModal');setTimeout(updateSanctionPreview,0);}
+function proposeAllianceWithConfirm(socketId,partnerCountryId){
+  const me=myPlayer();
+  const myInf=getInfluence(me?.countryId);
+  const pi=getInfluence(partnerCountryId);
+  const pc=gameState?.countries?.find(c=>c.id===partnerCountryId);
+  let bonusMsg;
+  if(pi>myInf){bonusMsg=`Allying with ${pc?.flag||''}${pc?.name||partnerCountryId} will give you +${(0.1*(pi/myInf)).toFixed(2)}% growth bonus per turn.`;}
+  else{bonusMsg=`Allying with ${pc?.flag||''}${pc?.name||partnerCountryId} will give you +0.05% growth bonus per turn (you are the larger economy — they benefit more).`;}
+  if(confirm(bonusMsg+'\n\nSend alliance proposal?'))socket.emit('proposeAlliance',{targetSocketId:socketId});
+}
 
 function openJustification(){
   document.getElementById('justText').value='';

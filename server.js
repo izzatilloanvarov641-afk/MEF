@@ -201,8 +201,43 @@ function calcEHS(c, startCap) {
 function simulateCountry(c, policy, room) {
   const q = turnLabel(room);
 
-  // Pre-compute sanctions so AI can react to them this same turn
-  const sanctionCount = (room.sanctions||[]).filter(s=>s.target===c.id&&s.active).length;
+  // Influence = sqrt(gdp / 1000) — bigger economies hit harder, benefit more
+  const myInfluence = Math.sqrt(Math.max(0.1, c.gdp) / 1000);
+
+  // Weighted sanction effects — iterate per sanction using sanctioner's influence
+  const activeSanctions = (room.sanctions||[]).filter(s=>s.target===c.id&&s.active);
+  const sanctionCount = activeSanctions.length;
+  let totalExportDrop=0, totalFdiDrop=0, totalCurrencyHit=0, totalCreditDrop=0;
+  activeSanctions.forEach(s=>{
+    const sc = s.from==='ADMIN' ? null : (room.countries||[]).find(co=>co.id===s.from);
+    const si = sc ? Math.sqrt(Math.max(0.1, sc.gdp)/1000) : 3; // ADMIN = mid-tier influence
+    const ratio = si / myInfluence;
+    totalExportDrop  += 0.15 * ratio;
+    totalFdiDrop     += 20   * ratio;
+    totalCurrencyHit += 5    * ratio;
+    totalCreditDrop  += 0.3  * (si / 5);
+  });
+  totalExportDrop  = Math.min(0.40, totalExportDrop);
+  totalFdiDrop     = Math.min(100,  totalFdiDrop);
+  totalCurrencyHit = Math.min(20,   totalCurrencyHit);
+  totalCreditDrop  = Math.min(1.5,  totalCreditDrop);
+
+  // Weighted alliance effects — larger partners give bigger bonus
+  let allyGrowthEff=0, allyTradeDiscount=0;
+  (room.alliances||[]).filter(a=>a.active&&(a.a===c.id||a.b===c.id)).forEach(a=>{
+    const partnerId = a.a===c.id ? a.b : a.a;
+    const partner = (room.countries||[]).find(co=>co.id===partnerId);
+    const pi = partner ? Math.sqrt(Math.max(0.1, partner.gdp)/1000) : myInfluence;
+    if(pi > myInfluence){
+      allyGrowthEff    += Math.min(0.5, 0.1 * (pi / myInfluence));
+      allyTradeDiscount += Math.min(0.30, 0.10 + 0.05 * (pi / myInfluence));
+    } else {
+      allyGrowthEff    += 0.05;
+      allyTradeDiscount += 0.10;
+    }
+  });
+  allyGrowthEff    = Math.min(1.0, allyGrowthEff);
+  allyTradeDiscount = Math.min(0.30, allyTradeDiscount);
 
   // Apply policy
   if (policy && policy.interest !== undefined && policy.tax !== undefined && policy.govSpend !== undefined) {
@@ -268,12 +303,10 @@ function simulateCountry(c, policy, room) {
   const infraEff = (c._infraDelayed||0)*0.05;
   c._infraDelayed = c.infraSpend || 0;
 
-  // Alliances
-  const allyCount = (room.alliances||[]).filter(a=>a.active&&(a.a===c.id||a.b===c.id)).length;
-  const allyEff = Math.min(0.3, allyCount*0.05);
-
-  // Sanctions effect on growth
-  const sanctionEff = sanctionCount>2?-0.6:sanctionCount>0?-0.2:0;
+  // Sanctions growth drag (tied to export drop magnitude)
+  const sanctionEff = -Math.min(1.5, totalExportDrop * 2);
+  // Alliance growth bonus (already computed above as allyGrowthEff)
+  const allyEff = allyGrowthEff;
 
   // Disasters
   const activeDisasters = (room.disasters||[]).filter(d=>d.countryId===c.id&&d.turnsLeft>0);
@@ -321,7 +354,7 @@ function simulateCountry(c, policy, room) {
   if(c.growth<-3)cs-=0.8;else if(c.growth>5)cs+=0.3;
   if(c.fdi<-20)cs-=0.5;
   if(c.unemployment>20)cs-=0.4;
-  if(sanctionCount>0)cs-=0.3*sanctionCount;
+  if(totalCreditDrop>0)cs-=totalCreditDrop;
   const oldCS = Math.round(c.creditScore);
   // Rating agencies move slowly: cap at -1 notch down or +0.3 up per turn
   const csChange = cs - c.creditScore;
@@ -349,7 +382,7 @@ function simulateCountry(c, policy, room) {
   const ratingEff=(c.creditScore-7)*0.4;
   const fdiCurrEff=c.fdi>0?Math.log(c.fdi+1)*0.25:c.fdi*0.06;
   const monCurrEff=-(c.monetaryPolicy||0)*0.3;
-  const sanctCurrEff=sanctionCount>0?-3*sanctionCount:0;
+  const sanctCurrEff=-totalCurrencyHit;
   const disasterCurr=activeDisasters.reduce((s,d)=>s+(d.currencyEffect||0),0);
   const oldStr=c.currencyStrength;
   c.currencyStrength=Math.max(15,Math.min(220,c.currencyStrength+rateEff+tradeBalEff+inflEff+ratingEff+fdiCurrEff+monCurrEff+sanctCurrEff+disasterCurr+(Math.random()-0.5)*2));
@@ -362,14 +395,14 @@ function simulateCountry(c, policy, room) {
   // FDI
   const taxAttr=(25-c.tax)*2.5,ratingAttr=(c.creditScore-5)*6,growthAttr=c.growth*4;
   const tradeAttr=(c.tradeOpenness||0)*5,inflRep=c.inflation>12?-(c.inflation-12)*0.6:0;
-  const stabAttr=sanctionCount>0?-10:5;
+  const stabAttr=sanctionCount>0?-totalFdiDrop:5;
   c.fdi=Math.max(-60,Math.min(600,c.fdi+(taxAttr+ratingAttr+growthAttr+tradeAttr+inflRep+stabAttr)/10+(Math.random()-0.45)*5));
 
-  // Exports: only POSITIVE trade openness boosts them (your own tariffs don't hurt your exports;
-  // only partner retaliation does, which is captured by the tradeEff growth penalty).
-  // Weak currency makes exports cheaper abroad → competitiveness boost (Marshall-Lerner).
+  // Exports: sanctions shrink them, ally trade discounts boost them.
   const fxExportBoost = Math.max(-0.02, Math.min(0.02, (100-c.currencyStrength)*0.0005));
-  c.exports *= (1 + Math.max(0,c.tradeOpenness||0)*0.005 + fxExportBoost + Math.random()*0.01);
+  const sanctionExportDrag = totalExportDrop * 0.1; // applied per-turn (compounds gradually)
+  const allyExportBoost = allyTradeDiscount * 0.01;
+  c.exports *= (1 + Math.max(0,c.tradeOpenness||0)*0.005 + fxExportBoost + Math.random()*0.01 - sanctionExportDrag + allyExportBoost);
 
   // Imports: strong currency makes imports cheaper (more imports); growth raises incomes → more imports.
   // Protectionism (negative tradeOpenness) directly reduces imports.
