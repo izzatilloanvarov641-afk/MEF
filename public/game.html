@@ -274,6 +274,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   </div>
 </div>
 
+<!-- ALLIANCE MODAL -->
+<div class="modal-overlay" id="allianceModal">
+  <div class="modal">
+    <h3>Propose alliance</h3>
+    <p>Choose a player to ally with. They will receive a confirmation request.</p>
+    <div class="modal-field"><label>Ally with</label><select id="allianceTarget" onchange="updateAlliancePreview()"></select></div>
+    <div id="alliancePreview" style="display:none;font-size:11px;padding:6px 10px;border-radius:6px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);color:var(--green);margin-bottom:4px"></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeModal('allianceModal')">Cancel</button>
+      <button class="modal-ok" onclick="submitAlliance()">Propose →</button>
+    </div>
+  </div>
+</div>
+
 <!-- SANCTION MODAL -->
 <div class="modal-overlay" id="sanctionModal">
   <div class="modal">
@@ -641,9 +655,9 @@ function renderGeo(c,isMe){
     ${againstMe.length?`<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 8px">Sanctions against ${c.name}</div>${againstMe.map(s=>{const si=getInfluence(s.from);const pct=Math.min(40,Math.round(15*(si/myInf)));return `<div class="sanction-active"><span>${s.fromFlag} ${s.fromName} <span style="font-size:10px;color:var(--text3)">(inf:${si.toFixed(1)} · ≈${pct}% export hit)</span> — "${s.reason}"</span></div>`;}).join('')}`:''}
     <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 8px">Alliances</div>
     ${myAlliances.length?myAlliances.map(a=>{const partnerId=a.a===c.id?a.b:a.a;const pi=getInfluence(partnerId);const bonus=pi>myInf?`+${(0.1*(pi/myInf)).toFixed(2)}%/turn`:'flat +0.05%/turn';return `<div class="alliance-active">🤝 ${a.aName} ↔ ${a.bName} <span style="font-size:10px;color:var(--green)">(growth ${bonus})</span></div>`;}).join(''):`<div style="color:var(--text3);font-size:11px">No active alliances</div>`}
-    ${isMe?`<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:4px">
+    ${isMe?`<div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px">
       <button class="geo-btn" onclick="openSanctionModal()">⚠ Impose sanctions</button>
-      ${gameState.players.filter(p=>p.socketId!==socket?.id).map(p=>{const pi=getInfluence(p.countryId).toFixed(1);return `<button class="geo-btn" onclick="proposeAllianceWithConfirm('${p.socketId}','${p.countryId}')">🤝 Ally with ${p.name} <span style="font-size:10px;opacity:.7">(inf:${pi})</span></button>`;}).join('')}
+      <button class="geo-btn" onclick="openAllianceModal()">🤝 Propose alliance</button>
     </div>`:''}
   </div>`;
 }
@@ -732,16 +746,50 @@ function updateSanctionPreview(){
   el.textContent=`Sanctioning ${tC?.flag||''}${tC?.name||targetId} will cost them ≈${pct}% of exports per turn. (Your influence: ${myInf.toFixed(1)}, theirs: ${ti.toFixed(1)})`;
   el.style.display='block';
 }
-function openSanctionModal(){openModal('sanctionModal');setTimeout(updateSanctionPreview,0);}
-function proposeAllianceWithConfirm(socketId,partnerCountryId){
-  const me=myPlayer();
-  const myInf=getInfluence(me?.countryId);
+function openSanctionModal(){
+  const sel=document.getElementById('sanctionTarget');sel.innerHTML='';
+  gameState?.players.filter(p=>p.socketId!==socket?.id).forEach(p=>{
+    const co=gameState.countries.find(c=>c.id===p.countryId);
+    const inf=getInfluence(p.countryId).toFixed(1);
+    const o=document.createElement('option');
+    o.value=p.countryId;
+    o.textContent=(co?.flag||'')+' '+p.name+' (inf:'+inf+')';
+    sel.appendChild(o);
+  });
+  openModal('sanctionModal');setTimeout(updateSanctionPreview,0);
+}
+function openAllianceModal(){
+  const sel=document.getElementById('allianceTarget');sel.innerHTML='';
+  gameState?.players.filter(p=>p.socketId!==socket?.id).forEach(p=>{
+    const co=gameState.countries.find(c=>c.id===p.countryId);
+    const inf=getInfluence(p.countryId).toFixed(1);
+    const o=document.createElement('option');
+    o.value=p.socketId;o.dataset.countryId=p.countryId;
+    o.textContent=(co?.flag||'')+' '+p.name+' (inf:'+inf+')';
+    sel.appendChild(o);
+  });
+  openModal('allianceModal');setTimeout(updateAlliancePreview,0);
+}
+function updateAlliancePreview(){
+  const sel=document.getElementById('allianceTarget');
+  const el=document.getElementById('alliancePreview');
+  const opt=sel.options[sel.selectedIndex];
+  if(!opt||!gameState){el.style.display='none';return;}
+  const me=myPlayer();if(!me){el.style.display='none';return;}
+  const myInf=getInfluence(me.countryId);
+  const partnerCountryId=opt.dataset.countryId;
   const pi=getInfluence(partnerCountryId);
-  const pc=gameState?.countries?.find(c=>c.id===partnerCountryId);
-  let bonusMsg;
-  if(pi>myInf){bonusMsg=`Allying with ${pc?.flag||''}${pc?.name||partnerCountryId} will give you +${(0.1*(pi/myInf)).toFixed(2)}% growth bonus per turn.`;}
-  else{bonusMsg=`Allying with ${pc?.flag||''}${pc?.name||partnerCountryId} will give you +0.05% growth bonus per turn (you are the larger economy — they benefit more).`;}
-  if(confirm(bonusMsg+'\n\nSend alliance proposal?'))socket.emit('proposeAlliance',{targetSocketId:socketId});
+  const pc=gameState.countries.find(c=>c.id===partnerCountryId);
+  let msg;
+  if(pi>myInf){msg=`Allying with ${pc?.flag||''}${pc?.name||''} will give you +${(0.1*(pi/myInf)).toFixed(2)}% growth bonus per turn. (Their influence: ${pi.toFixed(1)}, yours: ${myInf.toFixed(1)})`;}
+  else{msg=`Allying with ${pc?.flag||''}${pc?.name||''} will give you +0.05% growth per turn. You are the larger economy — they benefit more. (Their influence: ${pi.toFixed(1)}, yours: ${myInf.toFixed(1)})`;}
+  el.textContent=msg;el.style.display='block';
+}
+function submitAlliance(){
+  const sel=document.getElementById('allianceTarget');
+  const socketId=sel.value;if(!socketId)return;
+  socket.emit('proposeAlliance',{targetSocketId:socketId});
+  closeModal('allianceModal');
 }
 
 function openJustification(){
