@@ -146,6 +146,7 @@ const CREDIT_LABELS = {10:'AAA',9:'AA',8:'A',7:'BBB',6:'BB',5:'B',4:'CCC',3:'CC'
 
 // ── ROOMS ────────────────────────────────────────────────────
 const rooms = {};
+const loanTimeouts = {};
 
 function genCode() { return crypto.randomBytes(3).toString('hex').toUpperCase(); }
 function deepClone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -674,23 +675,52 @@ io.on('connection', socket => {
     const room=rooms[code];if(!room)return;
     if(socket.user?.username!==ADMIN_USERNAME)return;
     const loan=room.loanRequests.find(l=>l.id===loanId);if(!loan)return;
-    loan.status='approved';loan.approvedAmount=approvedAmount;loan.interestRate=interestRate;loan.repaymentTurns=repaymentTurns;loan.note=note;
-    const totalRepayment=approvedAmount*(1+interestRate/100);
+    loan.status='awaiting_player';loan.approvedAmount=approvedAmount;loan.interestRate=interestRate;loan.repaymentTurns=repaymentTurns;loan.note=note;
+    // Auto-reject after 5 minutes if player doesn't respond
+    if(loanTimeouts[loanId])clearTimeout(loanTimeouts[loanId]);
+    loanTimeouts[loanId]=setTimeout(()=>{
+      if(loan.status==='awaiting_player'){
+        loan.status='auto_rejected';
+        io.to(loan.socketId).emit('loanRejected',{note:'Loan offer expired — no response within 5 minutes.'});
+        sendAdmin(code);
+      }
+      delete loanTimeouts[loanId];
+    },5*60*1000);
+    io.to(loan.socketId).emit('loanCounterOffer',{loanId,approvedAmount,interestRate,repaymentTurns,note});
+    sendAdmin(code);
+  });
+
+  socket.on('acceptLoan',({loanId})=>{
+    const code=socket.data.roomCode;const room=rooms[code];if(!room)return;
+    const loan=room.loanRequests.find(l=>l.id===loanId);if(!loan||loan.status!=='awaiting_player'||loan.socketId!==socket.id)return;
+    if(loanTimeouts[loanId]){clearTimeout(loanTimeouts[loanId]);delete loanTimeouts[loanId];}
+    loan.status='approved';
+    const totalRepayment=loan.approvedAmount*(1+loan.interestRate/100);
     const p=room.players.find(p=>p.socketId===loan.socketId);
     if(p){
-      p.budget+=approvedAmount;
-      p.loans.push({id:loanId,amount:approvedAmount,interestRate,totalRepayment,repaymentTurns,turnsLeft:repaymentTurns,active:true});
-      const c=getC(room,p.countryId);c.debt+=approvedAmount/c.gdp*100;
+      p.budget+=loan.approvedAmount;
+      p.loans.push({id:loanId,amount:loan.approvedAmount,interestRate:loan.interestRate,totalRepayment,repaymentTurns:loan.repaymentTurns,turnsLeft:loan.repaymentTurns,active:true});
+      const c=getC(room,p.countryId);c.debt+=loan.approvedAmount/c.gdp*100;
     }
-    room.eventLog.push({quarter:turnLabel(room),text:`🏦 World Bank approved $${approvedAmount}B loan to ${loan.countryFlag}${loan.playerName} at ${interestRate}% interest`,global:true});
-    io.to(loan.socketId).emit('loanApproved',{amount:approvedAmount,interestRate,repaymentTurns,note});
+    room.eventLog.push({quarter:turnLabel(room),text:`🏦 World Bank approved $${loan.approvedAmount}B loan to ${loan.countryFlag}${loan.playerName} at ${loan.interestRate}% interest`,global:true});
+    io.to(loan.socketId).emit('loanApproved',{amount:loan.approvedAmount,interestRate:loan.interestRate,repaymentTurns:loan.repaymentTurns,note:loan.note});
     sendState(code);sendAdmin(code);
+  });
+
+  socket.on('rejectLoan',({loanId})=>{
+    const code=socket.data.roomCode;const room=rooms[code];if(!room)return;
+    const loan=room.loanRequests.find(l=>l.id===loanId);if(!loan||loan.status!=='awaiting_player'||loan.socketId!==socket.id)return;
+    if(loanTimeouts[loanId]){clearTimeout(loanTimeouts[loanId]);delete loanTimeouts[loanId];}
+    loan.status='player_rejected';
+    io.to(loan.socketId).emit('loanRejected',{note:'You declined the loan offer.'});
+    sendAdmin(code);
   });
 
   socket.on('adminRejectLoan',({code,loanId,note})=>{
     const room=rooms[code];if(!room)return;
     if(socket.user?.username!==ADMIN_USERNAME)return;
     const loan=room.loanRequests.find(l=>l.id===loanId);if(!loan)return;
+    if(loanTimeouts[loanId]){clearTimeout(loanTimeouts[loanId]);delete loanTimeouts[loanId];}
     loan.status='rejected';loan.note=note;
     io.to(loan.socketId).emit('loanRejected',{note});
     sendAdmin(code);

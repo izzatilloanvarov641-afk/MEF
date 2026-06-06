@@ -302,6 +302,21 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   </div>
 </div>
 
+<!-- LOAN COUNTER-OFFER MODAL -->
+<div class="modal-overlay" id="loanOfferModal">
+  <div class="modal">
+    <h3>🏦 World Bank Loan Offer</h3>
+    <p style="color:var(--text2);margin-bottom:12px">The World Bank has reviewed your request and made the following offer:</p>
+    <div id="loanOfferDetails" style="background:var(--card2);border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px;line-height:1.8"></div>
+    <div id="loanOfferNote" style="display:none;background:rgba(200,168,74,.08);border:1px solid rgba(200,168,74,.2);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--gold);margin-bottom:12px"></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">Do you accept these terms? Auto-rejects in <span id="loanOfferCountdown" style="color:var(--gold);font-weight:600">5:00</span></div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="respondToLoanOffer(false)">Reject</button>
+      <button class="modal-ok" onclick="respondToLoanOffer(true)">Accept loan</button>
+    </div>
+  </div>
+</div>
+
 <div class="disaster-alert" id="disasterAlert"></div>
 <div class="loan-notif" id="loanNotif"></div>
 
@@ -338,6 +353,7 @@ function connectSocket(){
   socket.on('tradeAccepted',()=>{closeModal('negModal');appendChat({name:'System',text:'✓ Trade accepted!',system:true});});
   socket.on('tradeRejected',({reason})=>{closeModal('negModal');appendChat({name:'System',text:'✗ Trade rejected.'+(reason?' '+reason:''),system:true});});
   socket.on('disasterStruck',({countryName,disasterName,countryFlag})=>showDisasterAlert(`🌪 ${countryFlag} ${countryName} hit by ${disasterName}!`));
+  socket.on('loanCounterOffer',({loanId,approvedAmount,interestRate,repaymentTurns,note})=>showLoanCounterOffer({loanId,approvedAmount,interestRate,repaymentTurns,note}));
   socket.on('loanApproved',({amount,interestRate,note})=>showLoanNotif(`✓ Loan approved! $${amount}B at ${interestRate}% interest.${note?' Note: '+note:''}`,'success'));
   socket.on('loanRejected',({note})=>showLoanNotif(`✗ Loan rejected.${note?' Reason: '+note:''}`,'error'));
   socket.on('allianceProposal',({fromName,fromFlag,fromSocketId})=>{
@@ -778,6 +794,40 @@ function showDisasterAlert(msg){
 function showLoanNotif(msg,type){
   const el=document.getElementById('loanNotif');el.textContent=msg;el.style.borderColor=type==='success'?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)';el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),6000);
+}
+
+let _loanOfferId=null,_loanOfferTimer=null;
+function showLoanCounterOffer({loanId,approvedAmount,interestRate,repaymentTurns,note}){
+  _loanOfferId=loanId;
+  const totalRepayment=(approvedAmount*(1+interestRate/100)).toFixed(1);
+  document.getElementById('loanOfferDetails').innerHTML=
+    `<div><span style="color:var(--text3)">Amount:</span> <strong>$${approvedAmount}B</strong></div>`+
+    `<div><span style="color:var(--text3)">Interest rate:</span> <strong>${interestRate}%</strong></div>`+
+    `<div><span style="color:var(--text3)">Repayment period:</span> <strong>${repaymentTurns} turn(s)</strong></div>`+
+    `<div><span style="color:var(--text3)">Total repayment:</span> <strong>$${totalRepayment}B</strong></div>`;
+  const noteEl=document.getElementById('loanOfferNote');
+  if(note){noteEl.textContent='Note: '+note;noteEl.style.display='block';}
+  else{noteEl.style.display='none';}
+  openModal('loanOfferModal');
+  // 5-minute countdown
+  let secsLeft=5*60;
+  clearInterval(_loanOfferTimer);
+  _loanOfferTimer=setInterval(()=>{
+    secsLeft--;
+    const m=Math.floor(secsLeft/60),s=secsLeft%60;
+    const cd=document.getElementById('loanOfferCountdown');
+    if(cd)cd.textContent=m+':'+(s<10?'0':'')+s;
+    if(secsLeft<=0){clearInterval(_loanOfferTimer);closeModal('loanOfferModal');}
+  },1000);
+}
+function respondToLoanOffer(accept){
+  clearInterval(_loanOfferTimer);
+  closeModal('loanOfferModal');
+  if(_loanOfferId){
+    socket.emit(accept?'acceptLoan':'rejectLoan',{loanId:_loanOfferId});
+    if(!accept)showLoanNotif('Loan offer declined.','error');
+  }
+  _loanOfferId=null;
 }
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(el=>el.classList.remove('open'));});
