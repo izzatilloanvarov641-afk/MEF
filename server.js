@@ -104,7 +104,8 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 // ── GAME DATA ────────────────────────────────────────────────
-const G20 = [
+const COUNTRIES = [
+  // ── G20 ORIGINAL ────────────────────────────────────────────
   { id:'us', name:'United States', flag:'🇺🇸', gdp:29000, gdpCap:85000, pop:335, interest:5.25, tax:21, govSpend:25, exports:3050, imports:3200, inflation:3.1, growth:2.8, debt:122, currency:'USD', fxRate:1.00, unemployment:3.9, creditScore:9, creditLabel:'AA+', fdi:310, currencyStrength:100, budget:2000, resources:{oil:8,gas:8,coal:6,food:7,minerals:6,tech:10,manufacturing:9,pharma:9,finance:10,tourism:8} },
   { id:'cn', name:'China', flag:'🇨🇳', gdp:18600, gdpCap:13100, pop:1412, interest:3.45, tax:25, govSpend:32, exports:3380, imports:2590, inflation:0.3, growth:4.6, debt:84, currency:'CNY', fxRate:7.24, unemployment:5.1, creditScore:8, creditLabel:'A+', fdi:180, currencyStrength:100, budget:1200, resources:{oil:5,gas:5,coal:8,food:6,minerals:7,tech:8,manufacturing:10,pharma:6,finance:7,tourism:6} },
   { id:'de', name:'Germany', flag:'🇩🇪', gdp:4700, gdpCap:55600, pop:84, interest:4.50, tax:30, govSpend:45, exports:1710, imports:1560, inflation:2.3, growth:0.1, debt:64, currency:'EUR', fxRate:0.92, unemployment:3.4, creditScore:10, creditLabel:'AAA', fdi:120, currencyStrength:100, budget:800, resources:{oil:2,gas:3,coal:5,food:5,minerals:5,tech:9,manufacturing:10,pharma:8,finance:8,tourism:7} },
@@ -124,7 +125,39 @@ const G20 = [
   { id:'sa', name:'Saudi Arabia', flag:'🇸🇦', gdp:1100, gdpCap:30600, pop:36, interest:6.00, tax:20, govSpend:38, exports:330, imports:200, inflation:2.3, growth:1.8, debt:24, currency:'SAR', fxRate:3.75, unemployment:3.5, creditScore:8, creditLabel:'A', fdi:25, currencyStrength:100, budget:350, resources:{oil:10,gas:10,coal:2,food:2,minerals:5,tech:3,manufacturing:4,pharma:2,finance:6,tourism:5} },
   { id:'ar', name:'Argentina', flag:'🇦🇷', gdp:620, gdpCap:13200, pop:47, interest:40.00, tax:35, govSpend:38, exports:78, imports:60, inflation:140.0, growth:-2.8, debt:89, currency:'ARS', fxRate:870, unemployment:6.9, creditScore:1, creditLabel:'D', fdi:-5, currencyStrength:100, budget:100, resources:{oil:6,gas:7,coal:3,food:9,minerals:6,tech:3,manufacturing:4,pharma:3,finance:3,tourism:6} },
   { id:'za', name:'South Africa', flag:'🇿🇦', gdp:420, gdpCap:6800, pop:62, interest:8.25, tax:27, govSpend:32, exports:110, imports:120, inflation:5.3, growth:1.0, debt:74, currency:'ZAR', fxRate:18.7, unemployment:32.1, creditScore:6, creditLabel:'BB-', fdi:9, currencyStrength:100, budget:150, resources:{oil:3,gas:3,coal:8,food:5,minerals:9,tech:3,manufacturing:5,pharma:4,finance:5,tourism:6} },
-  { id:'eu', name:'European Union', flag:'🇪🇺', gdp:19400, gdpCap:37000, pop:449, interest:4.50, tax:22, govSpend:46, exports:2800, imports:2650, inflation:2.3, growth:1.0, debt:82, currency:'EUR', fxRate:0.92, unemployment:6.0, creditScore:9, creditLabel:'AA', fdi:200, currencyStrength:100, budget:1500, resources:{oil:3,gas:4,coal:4,food:6,minerals:5,tech:8,manufacturing:8,pharma:9,finance:9,tourism:9} }
+  { id:'eu', name:'European Union', flag:'🇪🇺', gdp:19400, gdpCap:37000, pop:449, interest:4.50, tax:22, govSpend:46, exports:2800, imports:2650, inflation:2.3, growth:1.0, debt:82, currency:'EUR', fxRate:0.92, unemployment:6.0, creditScore:9, creditLabel:'AA', fdi:200, currencyStrength:100, budget:1500, resources:{oil:3,gas:4,coal:4,food:6,minerals:5,tech:8,manufacturing:8,pharma:9,finance:9,tourism:9} },
+  // ── ASIA ────────────────────────────────────────────────────
+  { id:'uz', name:'Uzbekistan', flag:'🇺🇿', gdp:100, gdpCap:2800, pop:36, interest:13.5, tax:12, govSpend:25, exports:22, imports:28, inflation:9.8, growth:5.8, debt:37, currency:'UZS', fxRate:12700, unemployment:9.1, creditScore:6, creditLabel:'BB-', fdi:4, currencyStrength:100, budget:100, resources:{oil:6,gas:8,coal:5,food:7,minerals:8,tech:3,manufacturing:5,pharma:2,finance:2,tourism:5} },
+  { id:'pk', name:'Pakistan', flag:'🇵🇰', gdp:340, gdpCap:1500, pop:230, interest:17.0, tax:12, govSpend:22, exports:30, imports:60, inflation:23.0, growth:2.1, debt:74, currency:'PKR', fxRate:278, unemployment:6.3, creditScore:4, creditLabel:'CCC', fdi:2, currencyStrength:100, budget:150, resources:{oil:3,gas:5,coal:5,food:6,minerals:5,tech:4,manufacturing:5,pharma:4,finance:4,tourism:4} },
+  { id:'bd', name:'Bangladesh', flag:'🇧🇩', gdp:450, gdpCap:2700, pop:170, interest:8.0, tax:10, govSpend:14, exports:55, imports:70, inflation:9.5, growth:5.8, debt:39, currency:'BDT', fxRate:110, unemployment:5.1, creditScore:6, creditLabel:'BB-', fdi:3, currencyStrength:100, budget:180, resources:{oil:2,gas:6,coal:2,food:7,minerals:2,tech:3,manufacturing:8,pharma:4,finance:3,tourism:3} },
+  { id:'vn', name:'Vietnam', flag:'🇻🇳', gdp:430, gdpCap:4300, pop:98, interest:4.5, tax:20, govSpend:17, exports:390, imports:380, inflation:3.5, growth:6.1, debt:37, currency:'VND', fxRate:25000, unemployment:2.3, creditScore:6, creditLabel:'BB+', fdi:18, currencyStrength:100, budget:180, resources:{oil:4,gas:5,coal:5,food:8,minerals:5,tech:5,manufacturing:9,pharma:3,finance:4,tourism:7} },
+  { id:'th', name:'Thailand', flag:'🇹🇭', gdp:540, gdpCap:7600, pop:71, interest:2.5, tax:20, govSpend:23, exports:295, imports:280, inflation:1.2, growth:2.8, debt:62, currency:'THB', fxRate:35, unemployment:1.1, creditScore:7, creditLabel:'BBB+', fdi:11, currencyStrength:100, budget:200, resources:{oil:3,gas:4,coal:2,food:8,minerals:5,tech:5,manufacturing:8,pharma:4,finance:6,tourism:9} },
+  { id:'my', name:'Malaysia', flag:'🇲🇾', gdp:430, gdpCap:12500, pop:33, interest:3.0, tax:24, govSpend:19, exports:310, imports:270, inflation:2.1, growth:4.3, debt:67, currency:'MYR', fxRate:4.7, unemployment:3.4, creditScore:8, creditLabel:'A-', fdi:13, currencyStrength:100, budget:180, resources:{oil:6,gas:7,coal:3,food:7,minerals:7,tech:6,manufacturing:8,pharma:3,finance:7,tourism:7} },
+  { id:'kz', name:'Kazakhstan', flag:'🇰🇿', gdp:260, gdpCap:13000, pop:19, interest:14.5, tax:20, govSpend:22, exports:85, imports:55, inflation:8.5, growth:4.8, debt:25, currency:'KZT', fxRate:460, unemployment:4.8, creditScore:7, creditLabel:'BBB-', fdi:10, currencyStrength:100, budget:150, resources:{oil:8,gas:8,coal:7,food:5,minerals:8,tech:3,manufacturing:5,pharma:2,finance:4,tourism:4} },
+  // ── AFRICA ──────────────────────────────────────────────────
+  { id:'ng', name:'Nigeria', flag:'🇳🇬', gdp:250, gdpCap:1100, pop:220, interest:27.5, tax:8, govSpend:12, exports:50, imports:65, inflation:33.0, growth:2.9, debt:38, currency:'NGN', fxRate:1600, unemployment:5.3, creditScore:5, creditLabel:'B-', fdi:5, currencyStrength:100, budget:150, resources:{oil:9,gas:8,coal:3,food:5,minerals:6,tech:3,manufacturing:3,pharma:2,finance:5,tourism:4} },
+  { id:'eg', name:'Egypt', flag:'🇪🇬', gdp:400, gdpCap:3700, pop:105, interest:27.25, tax:22, govSpend:30, exports:50, imports:85, inflation:28.0, growth:2.7, debt:95, currency:'EGP', fxRate:48, unemployment:7.1, creditScore:5, creditLabel:'B', fdi:8, currencyStrength:100, budget:170, resources:{oil:5,gas:7,coal:2,food:5,minerals:5,tech:4,manufacturing:5,pharma:4,finance:5,tourism:8} },
+  { id:'ke', name:'Kenya', flag:'🇰🇪', gdp:120, gdpCap:2200, pop:55, interest:13.0, tax:18, govSpend:24, exports:16, imports:28, inflation:5.1, growth:5.0, debt:72, currency:'KES', fxRate:130, unemployment:5.7, creditScore:5, creditLabel:'B+', fdi:1, currencyStrength:100, budget:110, resources:{oil:2,gas:2,coal:2,food:7,minerals:5,tech:5,manufacturing:4,pharma:3,finance:5,tourism:7} },
+  { id:'et', name:'Ethiopia', flag:'🇪🇹', gdp:160, gdpCap:1300, pop:125, interest:7.0, tax:12, govSpend:17, exports:5, imports:20, inflation:28.0, growth:6.2, debt:55, currency:'ETB', fxRate:113, unemployment:3.5, creditScore:5, creditLabel:'B', fdi:2, currencyStrength:100, budget:120, resources:{oil:1,gas:2,coal:2,food:6,minerals:5,tech:3,manufacturing:4,pharma:2,finance:2,tourism:5} },
+  { id:'ma', name:'Morocco', flag:'🇲🇦', gdp:140, gdpCap:3700, pop:37, interest:2.75, tax:30, govSpend:26, exports:50, imports:70, inflation:2.5, growth:3.2, debt:70, currency:'MAD', fxRate:10, unemployment:13.0, creditScore:6, creditLabel:'BB+', fdi:2, currencyStrength:100, budget:110, resources:{oil:2,gas:3,coal:2,food:6,minerals:8,tech:3,manufacturing:5,pharma:3,finance:4,tourism:7} },
+  // ── EUROPE ──────────────────────────────────────────────────
+  { id:'pl', name:'Poland', flag:'🇵🇱', gdp:850, gdpCap:22000, pop:38, interest:5.75, tax:19, govSpend:43, exports:420, imports:400, inflation:4.9, growth:2.9, debt:54, currency:'PLN', fxRate:4.0, unemployment:5.1, creditScore:8, creditLabel:'A-', fdi:15, currencyStrength:100, budget:280, resources:{oil:2,gas:3,coal:7,food:6,minerals:5,tech:6,manufacturing:7,pharma:5,finance:6,tourism:6} },
+  { id:'nl', name:'Netherlands', flag:'🇳🇱', gdp:1100, gdpCap:62000, pop:18, interest:4.5, tax:26, govSpend:42, exports:700, imports:650, inflation:2.7, growth:0.6, debt:49, currency:'EUR', fxRate:0.92, unemployment:3.9, creditScore:10, creditLabel:'AAA', fdi:60, currencyStrength:100, budget:350, resources:{oil:3,gas:6,coal:2,food:7,minerals:3,tech:8,manufacturing:6,pharma:7,finance:9,tourism:7} },
+  { id:'se', name:'Sweden', flag:'🇸🇪', gdp:560, gdpCap:53000, pop:10, interest:2.5, tax:22, govSpend:47, exports:270, imports:260, inflation:2.3, growth:0.5, debt:33, currency:'SEK', fxRate:10.5, unemployment:8.5, creditScore:10, creditLabel:'AAA', fdi:15, currencyStrength:100, budget:210, resources:{oil:1,gas:2,coal:2,food:5,minerals:7,tech:9,manufacturing:7,pharma:7,finance:7,tourism:6} },
+  { id:'no', name:'Norway', flag:'🇳🇴', gdp:550, gdpCap:100000, pop:5.5, interest:4.5, tax:22, govSpend:44, exports:220, imports:115, inflation:3.1, growth:1.2, debt:18, currency:'NOK', fxRate:10.8, unemployment:3.9, creditScore:10, creditLabel:'AAA', fdi:13, currencyStrength:100, budget:250, resources:{oil:9,gas:10,coal:3,food:5,minerals:7,tech:7,manufacturing:5,pharma:5,finance:7,tourism:7} },
+  { id:'es', name:'Spain', flag:'🇪🇸', gdp:1600, gdpCap:33000, pop:47, interest:4.5, tax:25, govSpend:46, exports:445, imports:460, inflation:2.8, growth:2.9, debt:105, currency:'EUR', fxRate:0.92, unemployment:11.4, creditScore:8, creditLabel:'A-', fdi:28, currencyStrength:100, budget:450, resources:{oil:2,gas:2,coal:3,food:7,minerals:4,tech:5,manufacturing:6,pharma:6,finance:7,tourism:10} },
+  // ── AMERICAS ────────────────────────────────────────────────
+  { id:'co', name:'Colombia', flag:'🇨🇴', gdp:370, gdpCap:7200, pop:52, interest:9.75, tax:35, govSpend:30, exports:58, imports:68, inflation:5.3, growth:1.7, debt:55, currency:'COP', fxRate:4200, unemployment:10.2, creditScore:6, creditLabel:'BB+', fdi:14, currencyStrength:100, budget:160, resources:{oil:6,gas:5,coal:7,food:7,minerals:6,tech:3,manufacturing:4,pharma:3,finance:5,tourism:6} },
+  { id:'cl', name:'Chile', flag:'🇨🇱', gdp:320, gdpCap:16000, pop:19, interest:5.0, tax:27, govSpend:25, exports:100, imports:90, inflation:4.5, growth:2.3, debt:40, currency:'CLP', fxRate:950, unemployment:8.8, creditScore:8, creditLabel:'A-', fdi:17, currencyStrength:100, budget:150, resources:{oil:2,gas:4,coal:4,food:6,minerals:9,tech:4,manufacturing:5,pharma:3,finance:5,tourism:6} },
+  { id:'pe', name:'Peru', flag:'🇵🇪', gdp:270, gdpCap:7900, pop:33, interest:6.75, tax:30, govSpend:18, exports:68, imports:60, inflation:3.2, growth:2.8, debt:34, currency:'PEN', fxRate:3.75, unemployment:7.4, creditScore:7, creditLabel:'BBB', fdi:8, currencyStrength:100, budget:140, resources:{oil:4,gas:5,coal:4,food:6,minerals:8,tech:3,manufacturing:4,pharma:3,finance:4,tourism:6} },
+  { id:'ve', name:'Venezuela', flag:'🇻🇪', gdp:85, gdpCap:2900, pop:29, interest:58.0, tax:34, govSpend:45, exports:15, imports:12, inflation:180.0, growth:3.5, debt:160, currency:'VES', fxRate:40, unemployment:7.5, creditScore:1, creditLabel:'D', fdi:-5, currencyStrength:100, budget:90, resources:{oil:10,gas:9,coal:4,food:4,minerals:6,tech:2,manufacturing:3,pharma:2,finance:2,tourism:3} },
+  // ── OCEANIA ──────────────────────────────────────────────────
+  { id:'nz', name:'New Zealand', flag:'🇳🇿', gdp:250, gdpCap:47000, pop:5, interest:5.25, tax:28, govSpend:32, exports:65, imports:70, inflation:2.5, growth:0.8, debt:44, currency:'NZD', fxRate:1.65, unemployment:4.7, creditScore:9, creditLabel:'AA', fdi:4, currencyStrength:100, budget:150, resources:{oil:3,gas:4,coal:5,food:8,minerals:5,tech:5,manufacturing:4,pharma:4,finance:6,tourism:8} },
+  { id:'pg', name:'Papua New Guinea', flag:'🇵🇬', gdp:30, gdpCap:3200, pop:10, interest:3.0, tax:30, govSpend:24, exports:12, imports:7, inflation:5.1, growth:4.2, debt:52, currency:'PGK', fxRate:3.9, unemployment:2.8, creditScore:5, creditLabel:'B+', fdi:2, currencyStrength:100, budget:80, resources:{oil:6,gas:7,coal:4,food:6,minerals:7,tech:2,manufacturing:2,pharma:1,finance:2,tourism:4} },
+  // ── MIDDLE EAST ─────────────────────────────────────────────
+  { id:'ae', name:'UAE', flag:'🇦🇪', gdp:530, gdpCap:53000, pop:10, interest:5.4, tax:9, govSpend:29, exports:450, imports:395, inflation:2.3, growth:4.0, debt:30, currency:'AED', fxRate:3.67, unemployment:3.1, creditScore:9, creditLabel:'AA-', fdi:24, currencyStrength:100, budget:220, resources:{oil:8,gas:9,coal:1,food:2,minerals:4,tech:5,manufacturing:5,pharma:3,finance:9,tourism:9} },
+  { id:'ir', name:'Iran', flag:'🇮🇷', gdp:400, gdpCap:4600, pop:87, interest:23.0, tax:25, govSpend:40, exports:65, imports:60, inflation:40.0, growth:4.2, debt:30, currency:'IRR', fxRate:42000, unemployment:9.1, creditScore:1, creditLabel:'D', fdi:-3, currencyStrength:100, budget:160, resources:{oil:9,gas:10,coal:4,food:5,minerals:7,tech:4,manufacturing:5,pharma:3,finance:3,tourism:5} },
+  { id:'il', name:'Israel', flag:'🇮🇱', gdp:550, gdpCap:58000, pop:9.5, interest:4.5, tax:23, govSpend:39, exports:165, imports:135, inflation:3.5, growth:1.5, debt:62, currency:'ILS', fxRate:3.7, unemployment:3.5, creditScore:8, creditLabel:'A+', fdi:20, currencyStrength:100, budget:220, resources:{oil:2,gas:6,coal:1,food:4,minerals:5,tech:10,manufacturing:7,pharma:7,finance:7,tourism:6} },
 ];
 
 const COMMODITIES = [
@@ -157,7 +190,7 @@ function sendState(code) {
   const room = rooms[code];
   if (!room) return;
   io.to(code).emit('stateUpdate', {
-    code: room.code, phase: room.phase, turn: room.turn, maxTurns: room.maxTurns,
+    code: room.code, phase: room.phase, turn: room.turn, maxTurns: room.maxTurns, turnTimestamps: room.turnTimestamps,
     players: room.players.map(p => ({ name:p.name, countryId:p.countryId, socketId:p.socketId, ready:p.ready, budget:p.budget, inventory:p.inventory, gdpCapStart:p.gdpCapStart, history:p.history, ehs:p.ehs, loans:p.loans })),
     countries: room.countries, commodityPrices: room.commodityPrices,
     marketOffers: room.marketOffers, completedDeals: room.completedDeals,
@@ -457,6 +490,7 @@ function advanceTurn(room) {
   room.pendingActions={};
   room.players.forEach(p=>{p.ready=false;});
   room.turn++;
+  room.turnTimestamps[room.turn]=new Date().toISOString();
   if(room.turn>room.maxTurns)room.phase='ended';
 }
 
@@ -480,11 +514,12 @@ io.on('connection', socket => {
     const isAdmin = socket.user.username === ADMIN_USERNAME;
     rooms[code] = {
       code, hostSocketId:socket.id, phase:'lobby', turn:1, maxTurns:5,
-      players:[], countries:G20.map(c=>{ const cl=deepClone(c); cl._personality=AI_PERSONALITIES[Math.floor(Math.random()*AI_PERSONALITIES.length)]; cl._history=[c.gdpCap]; cl._infraDelayed=0; cl._naturalUnemp=c.unemployment; return cl; }),
+      players:[], countries:COUNTRIES.map(c=>{ const cl=deepClone(c); cl._personality=AI_PERSONALITIES[Math.floor(Math.random()*AI_PERSONALITIES.length)]; cl._history=[c.gdpCap]; cl._infraDelayed=0; cl._naturalUnemp=c.unemployment; return cl; }),
       commodityPrices:Object.fromEntries(COMMODITIES.map(c=>[c.id,c.basePrice])),
       marketOffers:[], completedDeals:[], eventLog:[], chat:[], offerCounter:0,
       pendingActions:{}, sanctions:[], alliances:[], tradeWars:[], loanRequests:[],
-      justifications:[], disasters:[], adminSocket: isAdmin ? socket.id : null
+      justifications:[], disasters:[], adminSocket: isAdmin ? socket.id : null,
+      turnTimestamps:{1:new Date().toISOString()}
     };
     if (!isAdmin) {
       rooms[code].players.push({ socketId:socket.id, name:socket.user.username, countryId:null, ready:false, budget:0, inventory:Object.fromEntries(COMMODITIES.map(c=>[c.id,0])), gdpCapStart:0, history:[], ehs:[], loans:[] });

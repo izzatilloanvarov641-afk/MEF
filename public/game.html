@@ -337,7 +337,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 
 <script>
 const COMMODITIES=[{id:'oil',name:'Oil',icon:'🛢'},{id:'gas',name:'Natural Gas',icon:'🔥'},{id:'coal',name:'Coal',icon:'⚫'},{id:'food',name:'Food',icon:'🌾'},{id:'minerals',name:'Minerals',icon:'⛏'},{id:'tech',name:'Technology',icon:'💡'},{id:'manufacturing',name:'Manufacturing',icon:'⚙️'},{id:'pharma',name:'Pharma',icon:'💊'},{id:'finance',name:'Finance',icon:'💰'},{id:'tourism',name:'Tourism',icon:'✈️'}];
-const G20_NAMES={us:'United States',cn:'China',de:'Germany',jp:'Japan',in:'India',uk:'United Kingdom',fr:'France',br:'Brazil',it:'Italy',ca:'Canada',ru:'Russia',kr:'South Korea',au:'Australia',mx:'Mexico',id:'Indonesia',tr:'Turkey',sa:'Saudi Arabia',ar:'Argentina',za:'South Africa',eu:'European Union'};
+const COUNTRY_NAMES={us:'United States',cn:'China',de:'Germany',jp:'Japan',in:'India',uk:'United Kingdom',fr:'France',br:'Brazil',it:'Italy',ca:'Canada',ru:'Russia',kr:'South Korea',au:'Australia',mx:'Mexico',id:'Indonesia',tr:'Turkey',sa:'Saudi Arabia',ar:'Argentina',za:'South Africa',eu:'European Union',uz:'Uzbekistan',pk:'Pakistan',bd:'Bangladesh',vn:'Vietnam',th:'Thailand',my:'Malaysia',kz:'Kazakhstan',ng:'Nigeria',eg:'Egypt',ke:'Kenya',et:'Ethiopia',ma:'Morocco',pl:'Poland',nl:'Netherlands',se:'Sweden',no:'Norway',es:'Spain',co:'Colombia',cl:'Chile',pe:'Peru',ve:'Venezuela',nz:'New Zealand',pg:'Papua New Guinea',ae:'UAE',ir:'Iran',il:'Israel'};
 
 let socket,myUser,gameState=null,viewId=null,activeChart=null;
 let myPolicy={},negOffer=null,incomingTrade=null;
@@ -397,7 +397,9 @@ function renderAll(){
 function updateTopbar(me,c){
   document.getElementById('topFlag').textContent=c.flag;
   document.getElementById('topName').textContent=me.name+' · '+c.name;
-  document.getElementById('topTurn').textContent=`Turn ${gameState.turn} of ${gameState.maxTurns}`;
+  const _ts=gameState.turnTimestamps?.[gameState.turn];
+  const _ds=_ts?new Date(_ts).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}):'';
+  document.getElementById('topTurn').textContent=`Turn ${gameState.turn} of ${gameState.maxTurns}${_ds?' — '+_ds:''}`;
   document.getElementById('turnFill').style.width=(gameState.turn/gameState.maxTurns*100)+'%';
   const lastEhs=me.ehs?.[me.ehs.length-1]??'—';
   const ehsEl=document.getElementById('topEhs');

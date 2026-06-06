@@ -157,7 +157,7 @@ main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
 <div class="toast" id="toast"></div>
 
 <script>
-const G20 = [
+const COUNTRIES = [
   {id:'us',name:'United States',flag:'🇺🇸'},{id:'cn',name:'China',flag:'🇨🇳'},
   {id:'de',name:'Germany',flag:'🇩🇪'},{id:'jp',name:'Japan',flag:'🇯🇵'},
   {id:'in',name:'India',flag:'🇮🇳'},{id:'uk',name:'United Kingdom',flag:'🇬🇧'},
@@ -167,7 +167,20 @@ const G20 = [
   {id:'au',name:'Australia',flag:'🇦🇺'},{id:'mx',name:'Mexico',flag:'🇲🇽'},
   {id:'id',name:'Indonesia',flag:'🇮🇩'},{id:'tr',name:'Turkey',flag:'🇹🇷'},
   {id:'sa',name:'Saudi Arabia',flag:'🇸🇦'},{id:'ar',name:'Argentina',flag:'🇦🇷'},
-  {id:'za',name:'South Africa',flag:'🇿🇦'},{id:'eu',name:'European Union',flag:'🇪🇺'}
+  {id:'za',name:'South Africa',flag:'🇿🇦'},{id:'eu',name:'European Union',flag:'🇪🇺'},
+  {id:'uz',name:'Uzbekistan',flag:'🇺🇿'},{id:'pk',name:'Pakistan',flag:'🇵🇰'},
+  {id:'bd',name:'Bangladesh',flag:'🇧🇩'},{id:'vn',name:'Vietnam',flag:'🇻🇳'},
+  {id:'th',name:'Thailand',flag:'🇹🇭'},{id:'my',name:'Malaysia',flag:'🇲🇾'},
+  {id:'kz',name:'Kazakhstan',flag:'🇰🇿'},{id:'ng',name:'Nigeria',flag:'🇳🇬'},
+  {id:'eg',name:'Egypt',flag:'🇪🇬'},{id:'ke',name:'Kenya',flag:'🇰🇪'},
+  {id:'et',name:'Ethiopia',flag:'🇪🇹'},{id:'ma',name:'Morocco',flag:'🇲🇦'},
+  {id:'pl',name:'Poland',flag:'🇵🇱'},{id:'nl',name:'Netherlands',flag:'🇳🇱'},
+  {id:'se',name:'Sweden',flag:'🇸🇪'},{id:'no',name:'Norway',flag:'🇳🇴'},
+  {id:'es',name:'Spain',flag:'🇪🇸'},{id:'co',name:'Colombia',flag:'🇨🇴'},
+  {id:'cl',name:'Chile',flag:'🇨🇱'},{id:'pe',name:'Peru',flag:'🇵🇪'},
+  {id:'ve',name:'Venezuela',flag:'🇻🇪'},{id:'nz',name:'New Zealand',flag:'🇳🇿'},
+  {id:'pg',name:'Papua New Guinea',flag:'🇵🇬'},{id:'ae',name:'UAE',flag:'🇦🇪'},
+  {id:'ir',name:'Iran',flag:'🇮🇷'},{id:'il',name:'Israel',flag:'🇮🇱'},
 ];
 
 let socket, myUser, myRoomCode, isHost=false, gameState=null;
@@ -201,7 +214,7 @@ function connectSocket() {
 
 function buildCountryGrid() {
   const grid = document.getElementById('countryGrid');
-  grid.innerHTML = G20.map(c => `
+  grid.innerHTML = COUNTRIES.map(c => `
     <div class="ctile" data-id="${c.id}" onclick="selectCountry('${c.id}')">
       <div class="cf">${c.flag}</div>
       <div class="cn2">${c.name.split(' ')[0]}</div>

@@ -356,7 +356,7 @@ function buildCountrySelect(elId, countries, onSelect) {
   const el = document.getElementById(elId);
   if (!el) return;
   const prevId = el.querySelector('.ctile.selected')?.dataset.id;
-  el.innerHTML = countries.slice(0, 20).map(c =>
+  el.innerHTML = countries.map(c =>
     `<div class="ctile" data-id="${c.id}"><div style="font-size:18px">${c.flag}</div><div style="font-size:9px;color:var(--text2);margin-top:2px">${c.name.split(' ')[0]}</div></div>`
   ).join('');
   el.querySelectorAll('.ctile').forEach(tile => {
