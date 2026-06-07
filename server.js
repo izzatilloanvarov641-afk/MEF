@@ -16,8 +16,8 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'mef-secret';
-const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || process.env.ADMIN_USERNAME || 'admin').split(',').map(u => u.trim());
-function userIsAdmin(username) { return ADMIN_USERNAMES.includes(username); }
+const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || process.env.ADMIN_USERNAME || 'admin').split(',').map(u => u.trim().toLowerCase());
+function userIsAdmin(username) { return ADMIN_USERNAMES.includes((username || '').toLowerCase()); }
 
 // ── DATABASE ─────────────────────────────────────────────────
 const supabase = createClient(
