@@ -16,7 +16,8 @@ const io = new Server(server, { cors: { origin: '*' } });
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'mef-secret';
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
+const ADMIN_USERNAMES = (process.env.ADMIN_USERNAMES || process.env.ADMIN_USERNAME || 'admin').split(',').map(u => u.trim());
+function userIsAdmin(username) { return ADMIN_USERNAMES.includes(username); }
 
 // ── DATABASE ─────────────────────────────────────────────────
 const supabase = createClient(
@@ -47,7 +48,7 @@ async function requireAuth(req, res, next) {
 
 function requireAdmin(req, res, next) {
   requireAuth(req, res, () => {
-    if (req.user.username !== ADMIN_USERNAME) return res.status(403).json({ error: 'Admin only' });
+    if (!userIsAdmin(req.user.username)) return res.status(403).json({ error: 'Admin only' });
     next();
   });
 }
@@ -67,10 +68,10 @@ app.post('/api/auth/register', async (req, res) => {
   const hash = await bcrypt.hash(password, 12);
   const id = Date.now().toString();
   const { error } = await supabase.from('users').insert({ id, username, email, password_hash: hash, games_played: 0, games_won: 0, best_ehs: 0, best_growth: 0, total_trades: 0, match_history: [], created_at: new Date().toISOString() });
-  if (error) return res.status(500).json({ error: 'Registration failed' });
+  if (error) { console.error('Registration error:', error); return res.status(500).json({ error: 'Registration failed' }); }
   const token = jwt.sign({ userId: id }, JWT_SECRET, { expiresIn: '7d' });
   res.cookie('mef_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
-  res.json({ success: true, user: { id, username, email, games_played: 0, games_won: 0, isAdmin: username === ADMIN_USERNAME } });
+  res.json({ success: true, user: { id, username, email, games_played: 0, games_won: 0, isAdmin: userIsAdmin(username) } });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -83,7 +84,7 @@ app.post('/api/auth/login', async (req, res) => {
   await supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id);
   const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
   res.cookie('mef_token', token, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
-  res.json({ success: true, user: { id: user.id, username: user.username, email: user.email, games_played: user.games_played, games_won: user.games_won, isAdmin: user.username === ADMIN_USERNAME } });
+  res.json({ success: true, user: { id: user.id, username: user.username, email: user.email, games_played: user.games_played, games_won: user.games_won, isAdmin: userIsAdmin(user.username) } });
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -93,7 +94,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   const { data: u } = await supabase.from('users').select('*').eq('id', req.user.id).maybeSingle();
-  res.json({ user: { ...req.user, isAdmin: req.user.username === ADMIN_USERNAME, match_history: u.match_history || [], best_ehs: u.best_ehs || 0, best_growth: u.best_growth || 0, total_trades: u.total_trades || 0 } });
+  res.json({ user: { ...req.user, isAdmin: userIsAdmin(req.user.username), match_history: u.match_history || [], best_ehs: u.best_ehs || 0, best_growth: u.best_growth || 0, total_trades: u.total_trades || 0 } });
 });
 
 app.get('/api/leaderboard', async (req, res) => {
@@ -510,25 +511,20 @@ io.on('connection', socket => {
 
   socket.on('createRoom', ({ name }, cb) => {
     if (!socket.user) return cb({ success:false, error:'Not logged in' });
+    if (!userIsAdmin(socket.user.username)) return cb({ success:false, error:'Only admins can create rooms' });
     const code = genCode();
-    const isAdmin = socket.user.username === ADMIN_USERNAME;
     rooms[code] = {
       code, hostSocketId:socket.id, phase:'lobby', turn:1, maxTurns:5,
       players:[], countries:COUNTRIES.map(c=>{ const cl=deepClone(c); cl._personality=AI_PERSONALITIES[Math.floor(Math.random()*AI_PERSONALITIES.length)]; cl._history=[c.gdpCap]; cl._infraDelayed=0; cl._naturalUnemp=c.unemployment; return cl; }),
       commodityPrices:Object.fromEntries(COMMODITIES.map(c=>[c.id,c.basePrice])),
       marketOffers:[], completedDeals:[], eventLog:[], chat:[], offerCounter:0,
       pendingActions:{}, sanctions:[], alliances:[], tradeWars:[], loanRequests:[],
-      justifications:[], disasters:[], adminSocket: isAdmin ? socket.id : null,
+      justifications:[], disasters:[], adminSocket: socket.id,
       turnTimestamps:{1:new Date().toISOString()}
     };
-    if (!isAdmin) {
-      rooms[code].players.push({ socketId:socket.id, name:socket.user.username, countryId:null, ready:false, budget:0, inventory:Object.fromEntries(COMMODITIES.map(c=>[c.id,0])), gdpCapStart:0, history:[], ehs:[], loans:[] });
-    } else {
-      rooms[code].adminSocket = socket.id;
-    }
     socket.join(code);
     socket.data.roomCode = code;
-    cb({ success:true, code, isAdmin });
+    cb({ success:true, code, isAdmin:true });
     sendState(code);
   });
 
@@ -537,13 +533,13 @@ io.on('connection', socket => {
     const room = rooms[code];
     if (!room) return cb({ success:false, error:'Room not found' });
     if (room.phase !== 'lobby') return cb({ success:false, error:'Game already started' });
-    const isAdmin = socket.user.username === ADMIN_USERNAME;
-    if (!isAdmin && room.players.length >= 4) return cb({ success:false, error:'Room full' });
-    if (isAdmin) { room.adminSocket = socket.id; }
+    const adminUser = userIsAdmin(socket.user.username);
+    if (!adminUser && room.players.length >= 4) return cb({ success:false, error:'Room full' });
+    if (adminUser) { room.adminSocket = socket.id; }
     else { room.players.push({ socketId:socket.id, name:socket.user.username, countryId:null, ready:false, budget:0, inventory:Object.fromEntries(COMMODITIES.map(c=>[c.id,0])), gdpCapStart:0, history:[], ehs:[], loans:[] }); }
     socket.join(code);
     socket.data.roomCode = code;
-    cb({ success:true, code, isAdmin });
+    cb({ success:true, code, isAdmin:adminUser });
     sendState(code);
     io.to(code).emit('chat', { name:'System', text:`${socket.user.username} joined!`, system:true });
   });
@@ -552,8 +548,8 @@ io.on('connection', socket => {
     if (!socket.user) return cb({ success: false, error: 'Not logged in' });
     const room = rooms[code];
     if (!room) return cb({ success: false, error: 'Room not found' });
-    const isAdmin = socket.user.username === ADMIN_USERNAME;
-    if (isAdmin) {
+    const adminUser = userIsAdmin(socket.user.username);
+    if (adminUser) {
       room.adminSocket = socket.id;
       socket.join(code);
       socket.data.roomCode = code;
@@ -709,7 +705,7 @@ io.on('connection', socket => {
   // ADMIN EVENTS
   socket.on('adminImposeSanction',({code,countryId,reason})=>{
     const room=rooms[code];if(!room)return;
-    if(socket.user?.username!==ADMIN_USERNAME)return;
+    if(!userIsAdmin(socket.user?.username))return;
     const c=getC(room,countryId);if(!c)return;
     room.sanctions.push({from:'ADMIN',fromFlag:'🌐',fromName:'Admin',target:countryId,targetFlag:c.flag,targetName:c.name,reason,active:true,turn:room.turn});
     room.eventLog.push({quarter:turnLabel(room),text:`🌐 ADMIN sanction imposed on ${c.flag}${c.name}: "${reason}"`,global:true});
@@ -718,7 +714,7 @@ io.on('connection', socket => {
 
   socket.on('adminDisaster',({code,countryId,disasterType})=>{
     const room=rooms[code];if(!room)return;
-    if(socket.user?.username!==ADMIN_USERNAME)return;
+    if(!userIsAdmin(socket.user?.username))return;
     const c=getC(room,countryId);if(!c)return;
     const DISASTERS={
       earthquake:{name:'Earthquake',gdpEffect:-2.0,inflationEffect:3,unemploymentEffect:2,currencyEffect:-2,turnsLeft:1},
@@ -741,7 +737,7 @@ io.on('connection', socket => {
 
   socket.on('adminApproveLoan',({code,loanId,approvedAmount,interestRate,repaymentTurns,note})=>{
     const room=rooms[code];if(!room)return;
-    if(socket.user?.username!==ADMIN_USERNAME)return;
+    if(!userIsAdmin(socket.user?.username))return;
     const loan=room.loanRequests.find(l=>l.id===loanId);if(!loan)return;
     loan.status='awaiting_player';loan.approvedAmount=approvedAmount;loan.interestRate=interestRate;loan.repaymentTurns=repaymentTurns;loan.note=note;
     // Auto-reject after 5 minutes if player doesn't respond
@@ -786,7 +782,7 @@ io.on('connection', socket => {
 
   socket.on('adminRejectLoan',({code,loanId,note})=>{
     const room=rooms[code];if(!room)return;
-    if(socket.user?.username!==ADMIN_USERNAME)return;
+    if(!userIsAdmin(socket.user?.username))return;
     const loan=room.loanRequests.find(l=>l.id===loanId);if(!loan)return;
     if(loanTimeouts[loanId]){clearTimeout(loanTimeouts[loanId]);delete loanTimeouts[loanId];}
     loan.status='rejected';loan.note=note;
@@ -796,7 +792,7 @@ io.on('connection', socket => {
 
   socket.on('adminScoreJustification',({code,idx,score,feedback})=>{
     const room=rooms[code];if(!room)return;
-    if(socket.user?.username!==ADMIN_USERNAME)return;
+    if(!userIsAdmin(socket.user?.username))return;
     const j=room.justifications[idx];if(!j)return;
     j.adminScore=score;j.adminFeedback=feedback;
     io.to(j.socketId).emit('justificationFeedback',{score,feedback,turn:j.turn});
@@ -805,7 +801,7 @@ io.on('connection', socket => {
 
   socket.on('adminAdjustIndicator',({code,countryId,field,value})=>{
     const room=rooms[code];if(!room)return;
-    if(socket.user?.username!==ADMIN_USERNAME)return;
+    if(!userIsAdmin(socket.user?.username))return;
     const c=getC(room,countryId);if(!c)return;
     c[field]=value;
     sendState(code);sendAdmin(code);
@@ -868,5 +864,5 @@ app.get('*', (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n✅ MEF server running → http://localhost:${PORT}\n   Admin: login as "${ADMIN_USERNAME}" then visit /admin\n`);
+  console.log(`\n✅ MEF server running → http://localhost:${PORT}\n   Admins: ${ADMIN_USERNAMES.join(', ')} — visit /admin\n`);
 });

@@ -36,6 +36,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);backgro
 .stat-val{font-size:22px;font-weight:500;font-family:var(--mono)}
 .btn{background:var(--gold);color:var(--bg);border:none;border-radius:7px;padding:8px 18px;font-size:12px;font-family:var(--font);font-weight:500;cursor:pointer;transition:all .2s}
 .btn:hover{background:#e2c46a}
+.btn:disabled{opacity:.4;cursor:not-allowed}
 .btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:7px;padding:7px 14px;font-size:12px;font-family:var(--font);cursor:pointer;transition:all .2s}
 .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
 .btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:7px 14px;font-size:12px;font-family:var(--font);cursor:pointer}
@@ -94,13 +95,57 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);backgro
 <body>
 
 <!-- ROOM SELECTOR OVERLAY -->
-<div id="roomSelector" style="position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px">
-  <div style="width:480px;max-width:100%">
+<div id="roomSelector" style="position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
+
+  <!-- CREATED ROOM VIEW (shown after creating a room) -->
+  <div id="createdRoomView" style="display:none;width:520px;max-width:100%">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-family:var(--display);font-size:48px;color:var(--gold);letter-spacing:.08em;line-height:1">MEF</div>
+      <div style="font-family:var(--display);font-size:16px;color:var(--text2);letter-spacing:.2em;margin-top:4px">ROOM CREATED</div>
+    </div>
+    <div class="card" style="margin-bottom:16px;text-align:center;border-color:rgba(200,168,74,.3)">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.15em;margin-bottom:14px">Share this code with players</div>
+      <div id="createdCodeDisplay" style="font-family:var(--display);font-size:88px;color:var(--gold);letter-spacing:.12em;padding:20px 16px 14px;background:rgba(200,168,74,.07);border-radius:12px;border:2px solid rgba(200,168,74,.3);text-shadow:0 0 48px rgba(200,168,74,.35);line-height:1">——</div>
+      <button id="copyCreatedBtn" onclick="copyCreatedCode()" style="margin-top:14px;background:var(--gold);color:var(--bg);border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-family:var(--font);font-weight:500;cursor:pointer;transition:all .2s">📋 Copy code</button>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em">Players joining (<span id="createdPlayerCount">0</span>)</div>
+      </div>
+      <div id="createdPlayerList" style="font-size:12px;color:var(--text3);min-height:56px">Waiting for players to join…</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">All players must pick a country before you can start.</div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button class="btn" style="flex:1;padding:14px;font-size:14px;letter-spacing:.03em" id="createdStartBtn" onclick="startCreatedRoom()" disabled>Start Game →</button>
+      <button class="btn-ghost" style="padding:14px 20px" onclick="enterAdminPanel()">Admin Panel →</button>
+    </div>
+    <div style="text-align:center">
+      <button class="btn-ghost" style="font-size:11px;padding:6px 16px" onclick="showMainSelector()">← Back to room list</button>
+    </div>
+  </div>
+
+  <!-- MAIN SELECTOR VIEW -->
+  <div id="mainSelectorView" style="width:480px;max-width:100%">
     <div style="text-align:center;margin-bottom:28px">
       <div style="font-family:var(--display);font-size:48px;color:var(--gold);letter-spacing:.08em;line-height:1">MEF</div>
       <div style="font-family:var(--display);font-size:18px;color:var(--text2);letter-spacing:.2em;margin-bottom:8px">ADMIN PANEL</div>
-      <div style="font-size:12px;color:var(--text3)">Enter a room code or select an active room to connect</div>
+      <div style="font-size:12px;color:var(--text3)">Create a new game or connect to an active room</div>
     </div>
+
+    <!-- CREATE NEW ROOM — prominent -->
+    <div class="card" style="margin-bottom:14px;border-color:rgba(200,168,74,.3);background:rgba(200,168,74,.04)">
+      <button class="btn" style="width:100%;font-size:15px;padding:16px 24px;letter-spacing:.04em" onclick="createNewRoom()">+ Create New Game Room</button>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:10px">A 6-letter code will be generated to share with players via WhatsApp / Telegram</div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div style="display:flex;align-items:center;gap:12px;margin:16px 0">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:11px;color:var(--text3)">or join existing</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
+    <!-- CONNECT TO EXISTING ROOM -->
     <div class="card" style="margin-bottom:12px">
       <div class="card-title">Connect to room</div>
       <div style="display:flex;gap:8px">
@@ -112,6 +157,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);backgro
       </div>
       <div id="rsErr" style="font-size:11px;color:var(--red);margin-top:6px;display:none"></div>
     </div>
+
+    <!-- ACTIVE ROOMS -->
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
         <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em">Active rooms</div>
@@ -129,6 +176,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);backgro
     <span class="room-badge" id="roomBadge">Room: —</span>
     <div class="spacer"></div>
     <span style="font-size:12px;color:var(--text2)">Turn: <strong id="turnBadge" style="color:var(--text)">—</strong></span>
+    <button class="btn-ghost" style="font-size:11px" onclick="showMainSelector();document.getElementById('roomSelector').style.display='flex'">+ New Room</button>
     <button class="btn-ghost" style="font-size:11px" onclick="window.location.href='/'">← Exit</button>
   </div>
   <div class="content">
@@ -219,6 +267,7 @@ let socket, myUser, adminState=null, roomCode=null;
 let selectedDisasterCountry=null, selectedDisasterType=null;
 let selectedIndicatorCountry=null;
 let justScores={};
+let createdRoomCode=null;
 
 const roomParam = new URLSearchParams(window.location.search).get('room');
 
@@ -240,12 +289,79 @@ function connectSocket(){
       connectToRoom();
     }
   });
-  socket.on('stateUpdate',state=>{renderAllTabs(state);});
+  socket.on('stateUpdate',state=>{
+    // Update created-room lobby view if it's visible
+    const cv=document.getElementById('createdRoomView');
+    if(cv&&cv.style.display!=='none'){updateCreatedRoomView(state);}
+    renderAllTabs(state);
+  });
   socket.on('adminUpdate',state=>{adminState=state;renderAllTabs(state);});
   socket.on('gameStarted',()=>{});
   socket.on('chat',()=>{});
 }
 
+// ── ROOM CREATION ────────────────────────────────────────────
+function createNewRoom(){
+  if(!socket||!socket.connected){showRsErr('Not connected yet — please wait…');return;}
+  socket.emit('createRoom',{name:myUser.username},res=>{
+    if(!res.success){showRsErr(res.error||'Failed to create room');return;}
+    createdRoomCode=res.code;
+    roomCode=res.code;
+    document.getElementById('createdCodeDisplay').textContent=res.code;
+    document.getElementById('roomBadge').textContent='Room: '+res.code;
+    document.getElementById('mainSelectorView').style.display='none';
+    document.getElementById('createdRoomView').style.display='block';
+  });
+}
+
+function copyCreatedCode(){
+  if(!createdRoomCode)return;
+  navigator.clipboard.writeText(createdRoomCode).then(()=>{
+    const btn=document.getElementById('copyCreatedBtn');
+    btn.textContent='✓ Copied!';
+    btn.style.background='var(--green)';
+    setTimeout(()=>{btn.textContent='📋 Copy code';btn.style.background='';},2000);
+  });
+}
+
+function updateCreatedRoomView(state){
+  const players=state.players||[];
+  document.getElementById('createdPlayerCount').textContent=players.length;
+  if(!players.length){
+    document.getElementById('createdPlayerList').innerHTML='<div style="color:var(--text3);padding:8px 0">Waiting for players to join…</div>';
+  }else{
+    document.getElementById('createdPlayerList').innerHTML=players.map(p=>{
+      const country=(state.countries||[]).find(c=>c.id===p.countryId);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:20px">${country?country.flag:'🌐'}</span>
+        <span style="flex:1;font-size:13px;font-weight:500">${p.name}</span>
+        <span style="font-size:11px;color:${p.countryId?'var(--green)':'var(--amber)'}">${p.countryId?(country?.name||'Picked'):'Picking…'}</span>
+      </div>`;
+    }).join('');
+  }
+  const allPicked=players.length>0&&players.every(p=>p.countryId);
+  document.getElementById('createdStartBtn').disabled=!allPicked;
+}
+
+function startCreatedRoom(){
+  socket.emit('startGame',{},res=>{
+    if(!res.success){alert(res.error||'Cannot start yet — all players must pick a country');return;}
+    enterAdminPanel();
+  });
+}
+
+function enterAdminPanel(){
+  if(!roomCode)return;
+  document.getElementById('roomBadge').textContent='Room: '+roomCode;
+  document.getElementById('roomSelector').style.display='none';
+}
+
+function showMainSelector(){
+  document.getElementById('createdRoomView').style.display='none';
+  document.getElementById('mainSelectorView').style.display='block';
+}
+
+// ── ROOM CONNECT ─────────────────────────────────────────────
 async function loadRooms(){
   try{
     const res=await fetch('/api/admin/rooms',{credentials:'include'});
@@ -290,6 +406,7 @@ function showRsErr(msg){
   el.textContent=msg;el.style.display='block';
 }
 
+// ── RENDER TABS ──────────────────────────────────────────────
 function renderAllTabs(state){
   if(!state)return;
   adminState=state;
@@ -312,8 +429,9 @@ function renderOverview(state){
   </div>
   <div class="card">
     <div class="card-title">All countries — live status</div>
+    ${state.phase==='lobby'?`<div style="font-size:12px;color:var(--text3);margin-bottom:10px">Lobby — waiting for players to pick countries</div>`:''}
     ${(state.players||[]).map(p=>{
-      const c=(state.countries||[]).find(x=>x.id===p.countryId);if(!c)return '';
+      const c=(state.countries||[]).find(x=>x.id===p.countryId);if(!c)return `<div class="country-overview"><span class="co-flag">🌐</span><div><div class="co-name">${p.name}</div><div class="co-stats">Picking country…</div></div></div>`;
       const ehs=p.ehs?.[p.ehs.length-1]??'—';
       return `<div class="country-overview">
         <span class="co-flag">${c.flag}</span>
@@ -345,8 +463,6 @@ function renderTradelog(state){
 function renderDisasters(state){
   const active=(state.disasters||[]).filter(d=>d.turnsLeft>0);
   document.getElementById('activeDisasters').innerHTML=active.length?active.map(d=>`<div style="padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--red)">${d.countryFlag} ${d.name} · ${d.turnsLeft} turn(s) remaining</div>`).join(''):'<div style="font-size:12px;color:var(--text3)">No active disasters</div>';
-
-  // Build country selects
   const countries=state.countries||[];
   buildCountrySelect('disasterCountrySelect',countries,id=>{selectedDisasterCountry=id;});
   buildCountrySelect('indicatorCountrySelect',countries,id=>{selectedIndicatorCountry=id;renderIndicatorFields(id,state);});

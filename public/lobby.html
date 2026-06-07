@@ -20,14 +20,11 @@ nav{background:rgba(6,8,15,.9);border-bottom:1px solid var(--border);padding:0 3
 .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:9px 20px;font-size:13px;font-family:var(--font);cursor:pointer;transition:all .2s}
 .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
-.btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:6px 14px;font-size:12px;font-family:var(--font);cursor:pointer}
 
-main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
+main{flex:1;padding:40px 24px;max-width:700px;margin:0 auto;width:100%}
 .page-title{font-family:var(--display);font-size:48px;color:var(--gold);letter-spacing:.05em;margin-bottom:6px}
-.page-sub{font-size:14px;color:var(--text2);margin-bottom:32px}
-
-.lobby-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-@media(max-width:700px){.lobby-grid{grid-template-columns:1fr}}
+.page-sub{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.6}
+.page-sub span{color:var(--text);font-weight:500}
 
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 24px}
 .card-title{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
@@ -38,8 +35,6 @@ main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
 .room-code{font-family:var(--display);font-size:80px;color:var(--gold);letter-spacing:.12em;text-align:center;padding:20px 16px 12px;background:rgba(200,168,74,.07);border-radius:12px;border:2px solid rgba(200,168,74,.3);text-shadow:0 0 48px rgba(200,168,74,.35);line-height:1}
 
 /* lobby room view */
-.lobby-room{display:none}
-.lobby-room.active{display:block}
 .player-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
 .player-row{display:flex;align-items:center;gap:10px;padding:9px 12px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px}
 .player-flag{font-size:20px}
@@ -50,8 +45,6 @@ main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
 .player-status.picking{color:var(--amber)}
 
 /* country grid */
-.country-picker{display:none}
-.country-picker.active{display:block}
 .cp-title{font-size:14px;font-weight:500;margin-bottom:12px}
 .country-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;max-height:300px;overflow-y:auto}
 .country-grid::-webkit-scrollbar{width:3px}
@@ -75,11 +68,17 @@ main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
 .chat-row input:focus{outline:none;border-color:rgba(200,168,74,.3)}
 .chat-send{background:var(--gold);color:var(--bg);border:none;border-radius:6px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:var(--font)}
 
+.lobby-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:700px){.lobby-grid{grid-template-columns:1fr}}
+
 .err{font-size:12px;color:var(--red);margin-top:6px;display:none}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:10px 16px;font-size:12px;display:none;z-index:999}
 .toast.show{display:block}
 .toast.success{border-color:rgba(16,185,129,.4);color:var(--green)}
 .toast.error{border-color:rgba(239,68,68,.4);color:var(--red)}
+
+.waiting-banner{background:rgba(200,168,74,.06);border:1px solid rgba(200,168,74,.2);border-radius:10px;padding:16px 20px;margin-bottom:24px;font-size:13px;color:var(--text2);line-height:1.6}
+.waiting-banner .icon{font-size:20px;margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -91,25 +90,21 @@ main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
 
 <main>
   <div class="page-title">Game Lobby</div>
-  <div class="page-sub">Create a room or join with a code. Pick your nation and wait for the host to start.</div>
 
-  <!-- JOIN/CREATE SCREEN -->
+  <!-- JOIN SCREEN -->
   <div id="joinScreen">
-    <div class="lobby-grid">
-      <div class="card">
-        <div class="card-title">Create new room</div>
-        <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">Start a private game. Share the room code with friends. You can play solo against AI.</p>
-        <button class="btn" style="width:100%" onclick="createRoom()">Create room →</button>
+    <div class="waiting-banner">
+      <div class="icon">⏳</div>
+      Waiting for your admin to share a room code. Enter it below to join.
+    </div>
+    <div class="card" style="max-width:420px">
+      <div class="card-title">Enter room code</div>
+      <div class="field">
+        <label>Room code (6 letters)</label>
+        <input type="text" id="joinCodeInput" placeholder="e.g. A3F9B2" maxlength="6" style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.1em;font-size:20px;text-align:center" onkeydown="if(event.key==='Enter')joinRoom()">
       </div>
-      <div class="card">
-        <div class="card-title">Join existing room</div>
-        <div class="field">
-          <label>Room code</label>
-          <input type="text" id="joinCodeInput" placeholder="e.g. A3F9B2" maxlength="6" style="text-transform:uppercase;font-family:var(--mono);letter-spacing:.1em" onkeydown="if(event.key==='Enter')joinRoom()">
-        </div>
-        <div class="err" id="joinErr"></div>
-        <button class="btn-ghost" style="width:100%" onclick="joinRoom()">Join room →</button>
-      </div>
+      <div class="err" id="joinErr"></div>
+      <button class="btn" style="width:100%;margin-top:4px" onclick="joinRoom()">Join game →</button>
     </div>
   </div>
 
@@ -130,6 +125,9 @@ main{flex:1;padding:40px 24px;max-width:1000px;margin:0 auto;width:100%}
           <div id="startBtnWrap" style="display:none">
             <button class="btn" style="width:100%" id="startBtn" onclick="startGame()">Start game →</button>
             <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:6px">Empty slots will be filled by AI countries</div>
+          </div>
+          <div id="waitingForAdmin" style="font-size:12px;color:var(--text3);text-align:center;padding:8px 0">
+            Waiting for admin to start the game…
           </div>
         </div>
 
@@ -183,7 +181,7 @@ const COUNTRIES = [
   {id:'ir',name:'Iran',flag:'🇮🇷'},{id:'il',name:'Israel',flag:'🇮🇱'},
 ];
 
-let socket, myUser, myRoomCode, isHost=false, gameState=null;
+let socket, myUser, myRoomCode, gameState=null;
 
 async function init() {
   const res = await fetch('/api/auth/me', { credentials:'include' });
@@ -194,6 +192,12 @@ async function init() {
   if (myUser.isAdmin) { window.location.href = '/admin.html'; return; }
   connectSocket();
   buildCountryGrid();
+
+  // Auto-fill code from URL param if provided
+  const urlCode = new URLSearchParams(window.location.search).get('room');
+  if (urlCode) {
+    document.getElementById('joinCodeInput').value = urlCode.toUpperCase();
+  }
 }
 
 function connectSocket() {
@@ -225,17 +229,15 @@ function renderLobby(state) {
   const taken = state.players.map(p=>p.countryId).filter(Boolean);
   const me = state.players.find(p=>p.socketId===socket.id);
 
-  // Update country grid
   document.querySelectorAll('.ctile').forEach(el => {
     const id = el.dataset.id;
     el.classList.toggle('taken', taken.includes(id) && me?.countryId !== id);
     el.classList.toggle('selected', me?.countryId === id);
   });
 
-  // Player list
   const list = document.getElementById('playerList');
   list.innerHTML = state.players.map(p => {
-    const c = G20.find(x=>x.id===p.countryId);
+    const c = COUNTRIES.find(x=>x.id===p.countryId);
     const isMe = p.socketId === socket.id;
     return `<div class="player-row">
       <span class="player-flag">${c?c.flag:'🌐'}</span>
@@ -243,22 +245,6 @@ function renderLobby(state) {
       <span class="player-country">${c?c.name:'Picking...'}</span>
     </div>`;
   }).join('');
-
-  // Start button
-  const startWrap = document.getElementById('startBtnWrap');
-  if (isHost) {
-    startWrap.style.display = 'block';
-    document.getElementById('startBtn').disabled = state.players.some(p=>!p.countryId);
-  }
-}
-
-async function createRoom() {
-  socket.emit('createRoom', { name: myUser.username }, res => {
-    if (!res.success) { showToast(res.error, 'error'); return; }
-    myRoomCode = res.code;
-    isHost = true;
-    showRoomScreen(res.code);
-  });
 }
 
 function joinRoom() {
@@ -267,7 +253,6 @@ function joinRoom() {
   socket.emit('joinRoom', { code, name: myUser.username }, res => {
     if (!res.success) { showErr('joinErr', res.error); return; }
     myRoomCode = res.code;
-    isHost = false;
     showRoomScreen(res.code);
   });
 }
