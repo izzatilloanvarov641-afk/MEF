@@ -578,6 +578,18 @@ io.on('connection', socket => {
     sendState(code);
   });
 
+  socket.on('adminKickPlayer', ({ code, socketId, playerName }) => {
+    const room = rooms[code]; if (!room) return;
+    if (!userIsAdmin(socket.user?.username)) return;
+    const idx = room.players.findIndex(p => p.socketId === socketId);
+    if (idx === -1) return;
+    room.players.splice(idx, 1);
+    io.to(socketId).emit('kickedFromGame', {});
+    room.eventLog.push({ quarter: turnLabel(room), text: `🚫 Admin removed ${playerName} from the game`, global: true });
+    sendState(code);
+    sendAdmin(code);
+  });
+
   socket.on('selectCountry', ({ countryId }) => {
     const room = rooms[socket.data.roomCode]; if (!room) return;
     const p = room.players.find(p=>p.socketId===socket.id); if (!p) return;

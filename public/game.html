@@ -330,6 +330,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   </div>
 </div>
 
+<div class="modal-overlay" id="kickedModal">
+  <div class="modal">
+    <h3 style="color:var(--red)">Removed from game</h3>
+    <p style="color:var(--text2);margin:10px 0 18px">You have been removed from this game by the administrator.</p>
+    <div class="modal-btns">
+      <button class="modal-ok" onclick="localStorage.removeItem('men_room_code');window.location.href='/lobby.html'">OK</button>
+    </div>
+  </div>
+</div>
+
 <div class="disaster-alert" id="disasterAlert"></div>
 <div class="loan-notif" id="loanNotif"></div>
 
@@ -355,16 +365,17 @@ function connectSocket(){
   socket=io({auth:{token}});
   socket.on('connect',()=>{
     if(roomCode){
-      localStorage.setItem('mef_roomCode',roomCode);
+      localStorage.setItem('men_room_code',roomCode);
       socket.emit('rejoinRoom',{code:roomCode},res=>{
-        if(!res.success){localStorage.removeItem('mef_roomCode');alert('Room has ended.');window.location.href='/';}
+        if(!res.success){localStorage.removeItem('men_room_code');alert('Room has ended.');window.location.href='/';}
       });
     }
   });
   socket.on('stateUpdate',state=>{gameState=state;clearTimeout(renderTimer);renderTimer=setTimeout(renderAll,80);});
   socket.on('turnAdvanced',({turn})=>{ clearTimeout(renderTimer); appendChat({name:'System',text:`⚙ Turn ${turn-1} complete. Turn ${turn} begins!`,system:true}); document.getElementById('readyBadge').style.display='none'; document.getElementById('endTurnBtn').disabled=false; myPolicy={}; if(activeChart){activeChart.destroy();activeChart=null;} renderAll(); });
   socket.on('playerReady',({name})=>appendChat({name:'System',text:`${name} submitted their turn`,system:true}));
-  socket.on('gameEnded',()=>showEndScreen());
+  socket.on('gameEnded',()=>{localStorage.removeItem('men_room_code');showEndScreen();});
+  socket.on('kickedFromGame',()=>{localStorage.removeItem('men_room_code');openModal('kickedModal');});
   socket.on('tradeProposal',p=>{incomingTrade=p;showTradeModal(p);});
   socket.on('tradeAccepted',()=>{closeModal('negModal');appendChat({name:'System',text:'✓ Trade accepted!',system:true});});
   socket.on('tradeRejected',({reason})=>{closeModal('negModal');appendChat({name:'System',text:'✗ Trade rejected.'+(reason?' '+reason:''),system:true});});

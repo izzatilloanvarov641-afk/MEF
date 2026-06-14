@@ -79,6 +79,7 @@ main{flex:1;padding:40px 24px;max-width:700px;margin:0 auto;width:100%}
 
 .waiting-banner{background:rgba(200,168,74,.06);border:1px solid rgba(200,168,74,.2);border-radius:10px;padding:16px 20px;margin-bottom:24px;font-size:13px;color:var(--text2);line-height:1.6}
 .waiting-banner .icon{font-size:20px;margin-bottom:6px}
+.rejoin-banner{background:rgba(37,99,235,.08);border:1px solid rgba(37,99,235,.3);border-radius:10px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:14px;font-size:13px}
 </style>
 </head>
 <body>
@@ -90,6 +91,17 @@ main{flex:1;padding:40px 24px;max-width:700px;margin:0 auto;width:100%}
 
 <main>
   <div class="page-title">Game Lobby</div>
+
+  <!-- REJOIN BANNER -->
+  <div id="rejoinBanner" class="rejoin-banner" style="display:none">
+    <span style="font-size:20px">🔄</span>
+    <div style="flex:1">
+      <div style="font-weight:500;color:var(--text)">You have an active game in progress. Room: <span id="rejoinRoomCode" style="font-family:var(--mono);color:var(--gold)"></span></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">Click to rejoin where you left off.</div>
+    </div>
+    <button class="btn" style="white-space:nowrap;font-size:13px;padding:8px 18px" onclick="rejoinActiveGame()">Rejoin game →</button>
+    <button class="btn-ghost" style="font-size:11px;padding:6px 12px" onclick="dismissRejoin()">Dismiss</button>
+  </div>
 
   <!-- JOIN SCREEN -->
   <div id="joinScreen">
@@ -198,6 +210,33 @@ async function init() {
   if (urlCode) {
     document.getElementById('joinCodeInput').value = urlCode.toUpperCase();
   }
+
+  // Show rejoin banner if there's a saved game session
+  const savedCode = localStorage.getItem('men_room_code');
+  if (savedCode && !urlCode) {
+    document.getElementById('rejoinRoomCode').textContent = savedCode;
+    document.getElementById('rejoinBanner').style.display = 'flex';
+  }
+}
+
+function rejoinActiveGame() {
+  const savedCode = localStorage.getItem('men_room_code');
+  if (!savedCode || !socket) return;
+  socket.emit('rejoinRoom', { code: savedCode }, res => {
+    if (res.success) {
+      myRoomCode = savedCode;
+      window.location.href = '/game.html?room=' + savedCode;
+    } else {
+      localStorage.removeItem('men_room_code');
+      document.getElementById('rejoinBanner').style.display = 'none';
+      alert('Your previous game has ended.');
+    }
+  });
+}
+
+function dismissRejoin() {
+  localStorage.removeItem('men_room_code');
+  document.getElementById('rejoinBanner').style.display = 'none';
 }
 
 function connectSocket() {
@@ -262,6 +301,7 @@ function joinRoom() {
   socket.emit('joinRoom', { code, name: myUser.username }, res => {
     if (!res.success) { showErr('joinErr', res.error); return; }
     myRoomCode = res.code;
+    localStorage.setItem('men_room_code', res.code);
     history.replaceState(null, '', '/lobby.html?room=' + res.code);
     showRoomScreen(res.code);
   });
