@@ -187,6 +187,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);backgro
       <div class="nav-item" onclick="showTab('loans')">🏦 World Bank</div>
       <div class="nav-item" onclick="showTab('justifications')">📝 Justifications</div>
       <div class="nav-item" onclick="showTab('indicators')">⚙️ Adjust indicators</div>
+      <div class="nav-item" id="nav-results" onclick="showTab('results')" style="display:none">🏆 Final Results</div>
     </div>
     <div class="main">
 
@@ -258,6 +259,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:var(--font);backgro
         </div>
       </div>
 
+      <!-- FINAL RESULTS -->
+      <div id="tab-results" class="tab-content">
+        <div class="page-title">Final Results</div>
+        <div class="page-sub">Game complete. Full rankings, EHS scores, and player justifications.</div>
+        <div id="finalResultsContent"><div style="color:var(--text3);font-size:12px">Results will appear here when the game ends.</div></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -298,6 +306,11 @@ function connectSocket(){
   socket.on('adminUpdate',state=>{adminState=state;renderAllTabs(state);});
   socket.on('gameStarted',()=>{});
   socket.on('chat',()=>{});
+  socket.on('gameEnded',()=>{
+    document.getElementById('nav-results').style.display='block';
+    showTab('results');
+    if(adminState)renderFinalResults(adminState);
+  });
 }
 
 // ── ROOM CREATION ────────────────────────────────────────────
@@ -416,6 +429,10 @@ function renderAllTabs(state){
   renderDisasters(state);
   renderLoans(state);
   renderJustifications(state);
+  if(state.phase==='ended'){
+    document.getElementById('nav-results').style.display='block';
+    renderFinalResults(state);
+  }
 }
 
 function renderOverview(state){
@@ -554,6 +571,49 @@ function renderJustifications(state){
       <button class="btn" onclick="submitJustScore(${i})">Submit →</button>
     </div>`:j.adminFeedback?`<div style="font-size:11px;color:var(--text2)">Feedback: "${j.adminFeedback}"</div>`:''}
   </div>`).join('');
+}
+
+function renderFinalResults(state){
+  const el=document.getElementById('finalResultsContent');if(!el)return;
+  const players=state.players||[];const countries=state.countries||[];
+  const sorted=[...players].sort((a,b)=>{
+    const ae=a.ehs?.reduce((s,v)=>s+v,0)/Math.max(a.ehs?.length||1,1);
+    const be=b.ehs?.reduce((s,v)=>s+v,0)/Math.max(b.ehs?.length||1,1);
+    return be-ae;
+  });
+  const medals=['🥇','🥈','🥉'];
+  const winner=sorted[0];const wc=countries.find(c=>c.id===winner?.countryId);
+  el.innerHTML=`<div class="card" style="border-color:rgba(200,168,74,.3);background:rgba(200,168,74,.04);text-align:center;margin-bottom:16px">
+    <div style="font-size:48px;margin-bottom:8px">🏆</div>
+    <div style="font-family:var(--display);font-size:36px;color:var(--gold);letter-spacing:.05em">${winner?.name||'—'} wins!</div>
+    <div style="font-size:14px;color:var(--text2);margin-top:8px">${wc?.flag||''} ${wc?.name||''} · Avg EHS: <strong>${Math.round(winner?.ehs?.reduce((s,v)=>s+v,0)/Math.max(winner?.ehs?.length||1,1))}</strong></div>
+  </div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">Final Rankings</div>
+    <table class="dtbl"><thead><tr><th>#</th><th>Player</th><th>Country</th><th>Avg EHS</th><th>Final EHS</th><th>GDP Growth</th></tr></thead><tbody>
+    ${sorted.map((p,i)=>{
+      const c=countries.find(x=>x.id===p.countryId);
+      const avgEhs=Math.round(p.ehs?.reduce((s,v)=>s+v,0)/Math.max(p.ehs?.length||1,1));
+      const lastEhs=p.ehs?.[p.ehs.length-1]??'—';
+      const growth=p.gdpCapStart&&c?((c.gdpCap-p.gdpCapStart)/p.gdpCapStart*100).toFixed(1)+'%':'—';
+      const ehsCol=avgEhs>60?'var(--green)':avgEhs>40?'var(--amber)':'var(--red)';
+      return `<tr><td style="font-size:16px">${medals[i]||'#'+(i+1)}</td><td><strong>${p.name}</strong></td><td>${c?.flag||''} ${c?.name||p.countryId}</td><td style="font-family:var(--mono);color:${ehsCol}">${avgEhs}</td><td style="font-family:var(--mono)">${lastEhs}</td><td style="font-family:var(--mono);color:${parseFloat(growth)>=0?'var(--green)':'var(--red)'}">${growth}</td></tr>`;
+    }).join('')}
+    </tbody></table>
+  </div>
+  ${(state.justifications||[]).length?`<div class="card">
+    <div class="card-title">All player justifications</div>
+    ${state.justifications.map(j=>{const c=countries.find(x=>x.id===j.countryId);return `<div style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:18px">${c?.flag||'🌐'}</span>
+        <strong>${j.playerName}</strong>
+        <span style="font-size:10px;color:var(--text3)">Turn ${j.turn}</span>
+        ${j.adminScore!==null?`<span class="badge badge-green">${j.adminScore}/10</span>`:'<span class="badge badge-amber">Unscored</span>'}
+        ${j.adminFeedback?`<span style="font-size:11px;color:var(--text2)">"${j.adminFeedback}"</span>`:''}
+      </div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.6;padding:8px;background:rgba(255,255,255,.02);border-radius:6px">${j.text}</div>
+    </div>`;}).join('')}
+  </div>`:''}`;
 }
 
 function setJustScore(idx,score,el){

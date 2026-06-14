@@ -196,7 +196,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
   <div class="turn-bar"><div class="turn-fill" id="turnFill" style="width:0%"></div></div>
 
   <div class="sidebar-left">
-    <div class="sb-sec"><div class="sb-lbl">Rankings (EHS)</div></div>
+    <div class="sb-sec"><div class="sb-lbl">Players</div></div>
     <div class="lb-list" id="lbList"></div>
   </div>
 
@@ -221,11 +221,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 <!-- END SCREEN -->
 <div id="endScreen">
   <div class="end-box">
-    <div style="font-size:36px;margin-bottom:10px">🏆</div>
-    <div style="font-family:var(--display);font-size:36px;letter-spacing:.04em;margin-bottom:6px" id="endTitle">Game Over</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Final Economic Health Scores</div>
-    <div class="end-podium" id="endPodium"></div>
-    <div style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:18px" id="endBody"></div>
+    <div style="font-size:36px;margin-bottom:14px">📋</div>
+    <div style="font-family:var(--display);font-size:36px;letter-spacing:.04em;margin-bottom:14px">Game Over</div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:20px">The game has ended. Your administrator will announce the results shortly.</div>
     <button class="end-btn" onclick="window.location.href='/'">Back to home</button>
   </div>
 </div>
@@ -356,9 +354,12 @@ function connectSocket(){
   const token=document.cookie.split('mef_token=')[1]?.split(';')[0];
   socket=io({auth:{token}});
   socket.on('connect',()=>{
-    if(roomCode)socket.emit('rejoinRoom',{code:roomCode},res=>{
-      if(!res.success){alert('Could not rejoin room: '+res.error);window.location.href='/';}
-    });
+    if(roomCode){
+      localStorage.setItem('mef_roomCode',roomCode);
+      socket.emit('rejoinRoom',{code:roomCode},res=>{
+        if(!res.success){localStorage.removeItem('mef_roomCode');alert('Room has ended.');window.location.href='/';}
+      });
+    }
   });
   socket.on('stateUpdate',state=>{gameState=state;renderAll();});
   socket.on('turnAdvanced',({turn})=>{ appendChat({name:'System',text:`⚙ Turn ${turn-1} complete. Turn ${turn} begins!`,system:true}); document.getElementById('readyBadge').style.display='none'; document.getElementById('endTurnBtn').disabled=false; myPolicy={}; if(activeChart){activeChart.destroy();activeChart=null;} });
@@ -408,16 +409,12 @@ function updateTopbar(me,c){
 }
 
 function renderLeaderboard(){
-  const sorted=[...gameState.players].sort((a,b)=>{
-    const ae=a.ehs?.[a.ehs.length-1]??0;const be=b.ehs?.[b.ehs.length-1]??0;return be-ae;
-  });
   const el=document.getElementById('lbList');el.innerHTML='';
-  sorted.forEach((p,i)=>{
+  gameState.players.forEach(p=>{
     const c=getC(p.countryId);if(!c)return;
-    const ehs=p.ehs?.[p.ehs.length-1]??'—';
     const isMe=p.socketId===socket?.id;
     const row=document.createElement('div');row.className='lb-row'+(isMe?' me':'');
-    row.innerHTML=`<span class="lb-rank">${i+1}</span><span class="lb-flag">${c.flag}</span><span class="lb-name">${p.name}</span><span class="lb-ehs ${ehs>60?'pos':'neg'}">${ehs}</span>`;
+    row.innerHTML=`<span class="lb-flag">${c.flag}</span><span class="lb-name">${p.name}${isMe?' (you)':''}</span><span class="lb-ehs" style="color:${p.ready?'var(--green)':'var(--text3)'}">${p.ready?'✓':'…'}</span>`;
     row.onclick=()=>{viewId=c.id;if(activeChart){activeChart.destroy();activeChart=null;}renderMain();};
     el.appendChild(row);
   });
@@ -842,19 +839,6 @@ function submitLoan(){
 }
 
 function showEndScreen(){
-  if(!gameState)return;
-  const sorted=[...gameState.players].sort((a,b)=>{
-    const ae=a.ehs?.reduce((s,v)=>s+v,0)/Math.max(a.ehs?.length||1,1);
-    const be=b.ehs?.reduce((s,v)=>s+v,0)/Math.max(b.ehs?.length||1,1);
-    return be-ae;
-  });
-  const medals=['🥇','🥈','🥉'];
-  document.getElementById('endPodium').innerHTML=sorted.slice(0,3).map((p,i)=>{
-    const c=getC(p.countryId);const avgEhs=Math.round(p.ehs?.reduce((s,v)=>s+v,0)/Math.max(p.ehs?.length||1,1));
-    return `<div class="end-place ${i===0?'gold':''}"><div style="font-size:24px">${medals[i]||''}${c?.flag}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">${p.name}</div><div style="font-size:13px;font-family:var(--mono);font-weight:500;margin-top:2px;color:${avgEhs>60?'var(--green)':'var(--red)'}">${avgEhs} EHS</div></div>`;
-  }).join('');
-  document.getElementById('endTitle').textContent=sorted[0]?.name+' wins!';
-  document.getElementById('endBody').textContent=`Game complete after ${gameState.maxTurns} turns. Winner: ${sorted[0]?.name} with an average EHS of ${Math.round(sorted[0]?.ehs?.reduce((s,v)=>s+v,0)/Math.max(sorted[0]?.ehs?.length||1,1))}.`;
   document.getElementById('endScreen').classList.add('show');
 }
 
