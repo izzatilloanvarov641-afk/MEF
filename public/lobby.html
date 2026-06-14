@@ -193,7 +193,7 @@ async function init() {
   connectSocket();
   buildCountryGrid();
 
-  // Auto-fill code from URL param if provided
+  // Auto-fill code from URL param (auto-join handled in socket.on('connect'))
   const urlCode = new URLSearchParams(window.location.search).get('room');
   if (urlCode) {
     document.getElementById('joinCodeInput').value = urlCode.toUpperCase();
@@ -203,6 +203,15 @@ async function init() {
 function connectSocket() {
   const token = document.cookie.split('mef_token=')[1]?.split(';')[0];
   socket = io({ auth: { token } });
+
+  socket.on('connect', () => {
+    const urlCode = new URLSearchParams(window.location.search).get('room');
+    if (urlCode && !myRoomCode) {
+      socket.emit('joinRoom', { code: urlCode.toUpperCase() }, res => {
+        if (res.success) { myRoomCode = res.code; showRoomScreen(res.code); }
+      });
+    }
+  });
 
   socket.on('stateUpdate', state => {
     gameState = state;
@@ -253,6 +262,7 @@ function joinRoom() {
   socket.emit('joinRoom', { code, name: myUser.username }, res => {
     if (!res.success) { showErr('joinErr', res.error); return; }
     myRoomCode = res.code;
+    history.replaceState(null, '', '/lobby.html?room=' + res.code);
     showRoomScreen(res.code);
   });
 }

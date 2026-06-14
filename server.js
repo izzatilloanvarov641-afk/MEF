@@ -534,14 +534,21 @@ io.on('connection', socket => {
     if (!room) return cb({ success:false, error:'Room not found' });
     if (room.phase !== 'lobby') return cb({ success:false, error:'Game already started' });
     const adminUser = userIsAdmin(socket.user.username);
-    if (!adminUser && room.players.length >= 4) return cb({ success:false, error:'Room full' });
-    if (adminUser) { room.adminSocket = socket.id; }
-    else { room.players.push({ socketId:socket.id, name:socket.user.username, countryId:null, ready:false, budget:0, inventory:Object.fromEntries(COMMODITIES.map(c=>[c.id,0])), gdpCapStart:0, history:[], ehs:[], loans:[] }); }
+    if (adminUser) {
+      room.adminSocket = socket.id;
+    } else {
+      const existing = room.players.find(p => p.name === socket.user.username);
+      if (existing) {
+        existing.socketId = socket.id;
+      } else {
+        room.players.push({ socketId:socket.id, name:socket.user.username, countryId:null, ready:false, budget:0, inventory:Object.fromEntries(COMMODITIES.map(c=>[c.id,0])), gdpCapStart:0, history:[], ehs:[], loans:[] });
+        io.to(code).emit('chat', { name:'System', text:`${socket.user.username} joined!`, system:true });
+      }
+    }
     socket.join(code);
     socket.data.roomCode = code;
     cb({ success:true, code, isAdmin:adminUser });
     sendState(code);
-    io.to(code).emit('chat', { name:'System', text:`${socket.user.username} joined!`, system:true });
   });
 
   socket.on('rejoinRoom', ({ code }, cb) => {
@@ -557,7 +564,14 @@ io.on('connection', socket => {
     }
     const player = room.players.find(p => p.name === socket.user.username);
     if (!player) return cb({ success: false, error: 'You are not in this room' });
+    const oldSocketId = player.socketId;
     player.socketId = socket.id;
+    if (room.pendingActions[oldSocketId] !== undefined) {
+      room.pendingActions[socket.id] = room.pendingActions[oldSocketId];
+      delete room.pendingActions[oldSocketId];
+    }
+    room.loanRequests.forEach(l => { if (l.socketId === oldSocketId) l.socketId = socket.id; });
+    room.justifications.forEach(j => { if (j.socketId === oldSocketId) j.socketId = socket.id; });
     socket.join(code);
     socket.data.roomCode = code;
     cb({ success: true, isAdmin: false });

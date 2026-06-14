@@ -120,7 +120,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;heigh
 .hchart{height:110px;position:relative}
 
 /* RIGHT SIDEBAR */
-.players-panel{padding:8px 12px;border-bottom:1px solid var(--border)}
+.players-panel{padding:8px 12px;border-bottom:1px solid var(--border);max-height:180px;overflow-y:auto}
 .pchip{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px}
 .pchip:last-child{border:none}
 .pchip-flag{font-size:13px}
@@ -338,7 +338,7 @@ const COMMODITIES=[{id:'oil',name:'Oil',icon:'🛢'},{id:'gas',name:'Natural Gas
 const COUNTRY_NAMES={us:'United States',cn:'China',de:'Germany',jp:'Japan',in:'India',uk:'United Kingdom',fr:'France',br:'Brazil',it:'Italy',ca:'Canada',ru:'Russia',kr:'South Korea',au:'Australia',mx:'Mexico',id:'Indonesia',tr:'Turkey',sa:'Saudi Arabia',ar:'Argentina',za:'South Africa',eu:'European Union',uz:'Uzbekistan',pk:'Pakistan',bd:'Bangladesh',vn:'Vietnam',th:'Thailand',my:'Malaysia',kz:'Kazakhstan',ng:'Nigeria',eg:'Egypt',ke:'Kenya',et:'Ethiopia',ma:'Morocco',pl:'Poland',nl:'Netherlands',se:'Sweden',no:'Norway',es:'Spain',co:'Colombia',cl:'Chile',pe:'Peru',ve:'Venezuela',nz:'New Zealand',pg:'Papua New Guinea',ae:'UAE',ir:'Iran',il:'Israel'};
 
 let socket,myUser,gameState=null,viewId=null,activeChart=null;
-let myPolicy={},negOffer=null,incomingTrade=null;
+let myPolicy={},negOffer=null,incomingTrade=null,renderTimer=null;
 
 const roomCode = new URLSearchParams(window.location.search).get('room');
 
@@ -361,8 +361,8 @@ function connectSocket(){
       });
     }
   });
-  socket.on('stateUpdate',state=>{gameState=state;renderAll();});
-  socket.on('turnAdvanced',({turn})=>{ appendChat({name:'System',text:`⚙ Turn ${turn-1} complete. Turn ${turn} begins!`,system:true}); document.getElementById('readyBadge').style.display='none'; document.getElementById('endTurnBtn').disabled=false; myPolicy={}; if(activeChart){activeChart.destroy();activeChart=null;} });
+  socket.on('stateUpdate',state=>{gameState=state;clearTimeout(renderTimer);renderTimer=setTimeout(renderAll,80);});
+  socket.on('turnAdvanced',({turn})=>{ clearTimeout(renderTimer); appendChat({name:'System',text:`⚙ Turn ${turn-1} complete. Turn ${turn} begins!`,system:true}); document.getElementById('readyBadge').style.display='none'; document.getElementById('endTurnBtn').disabled=false; myPolicy={}; if(activeChart){activeChart.destroy();activeChart=null;} renderAll(); });
   socket.on('playerReady',({name})=>appendChat({name:'System',text:`${name} submitted their turn`,system:true}));
   socket.on('gameEnded',()=>showEndScreen());
   socket.on('tradeProposal',p=>{incomingTrade=p;showTradeModal(p);});
@@ -798,12 +798,6 @@ function openJustification(){
     const words=document.getElementById('justText').value.trim().split(/\s+/).filter(w=>w.length>0).length;
     document.getElementById('justWordCount').textContent=words+' words'+(words<50?' (need '+50+' min)':'');
   };
-  // Populate sanction target select
-  const sel=document.getElementById('sanctionTarget');sel.innerHTML='';
-  gameState?.players.filter(p=>p.socketId!==socket?.id).forEach(p=>{
-    const c=getC(p.countryId);
-    const o=document.createElement('option');o.value=p.countryId;o.textContent=(c?.flag||'')+' '+p.name;sel.appendChild(o);
-  });
   openModal('justModal');
 }
 
